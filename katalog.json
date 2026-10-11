@@ -45,7 +45,7 @@
       "kategoria": "ogrod",
       "nazwa": "Worx Vision / RTK – inteligentny harmonogram koszenia",
       "wersja": "0.8.0",
-      "min_ha": "2025.1.0",
+      "min_ha": "2025.4.0",
       "krotki_opis": "Liczy przyrost trawy i wybiera najlepszą godzinę z prognozy. Najpierw krawędzie, potem ładowanie, potem koszenie.",
       "opis": [
         "Model przyrostu trawy z prognozy godzinowej (temperatura, UV, opad).",
@@ -54,7 +54,7 @@
         "Opcjonalnie: tylko wybrane dni, tylko za dnia, przerwa, gdy ktoś jest w ogrodzie, powiadomienia na telefon."
       ],
       "wymagania": [
-        "Home Assistant 2025.1 lub nowszy",
+        "Home Assistant 2025.4 lub nowszy",
         "Kosiarka Worx Vision / Vision Cloud",
         "Integracja Worx Vision Cloud PLUS 1.3.1 lub nowsza",
         "Trzy pomocniki: przyrost trawy, ostatnie koszenie, następne koszenie"
@@ -134,8 +134,8 @@
       "id": "x20-konserwacja",
       "kategoria": "dom",
       "nazwa": "Xiaomi X20 Max – powiadomienia o konserwacji",
-      "wersja": "1.0.1",
-      "min_ha": "2026.7.0",
+      "wersja": "1.1.0",
+      "min_ha": "2024.10.0",
       "krotki_opis": "Powiadomienie, gdy stacja zgłosi problem, robot zniknie z sieci albo trzeba uzupełnić detergent lub wymienić część.",
       "opis": [
         "Trwały problem stacji, niedostępność robota.",
@@ -143,7 +143,7 @@
         "Jedna automatyzacja na robota."
       ],
       "wymagania": [
-        "Home Assistant 2026.7 lub nowszy",
+        "Home Assistant 2024.10 lub nowszy",
         "Xiaomi Robot Vacuum X20 Max",
         "Integracja Xiaomi X20 Max"
       ],
