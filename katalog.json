@@ -76,16 +76,17 @@
       "id": "podlewanie",
       "kategoria": "ogrod",
       "nazwa": "Inteligentne podlewanie ogrodu – 1 do 12 sekcji",
-      "wersja": "1.5.0",
-      "min_ha": "2025.1.0",
+      "wersja": "1.6.0",
+      "min_ha": "2025.4.0",
       "krotki_opis": "Podlewa każdą sekcję wtedy, gdy gleba tego potrzebuje, z bilansem wody, prognozą i zmierzonym deszczem.",
       "opis": [
         "Od 1 do 12 sekcji, dla każdej osobno gleba, rośliny i typ zraszaczy.",
         "Trwały bilans wody każdej sekcji (ETo, deszcz, podlewanie).",
-        "Rain Bird RC2 oraz zawory i przekaźniki Sonoff, Shelly, ESPHome."
+        "Rain Bird RC2 oraz zawory i przekaźniki Sonoff, Shelly, ESPHome.",
+        "Nadzór zaworów: zamknięcie potwierdzane i ponawiane, limit czasu pracy sekcji."
       ],
       "wymagania": [
-        "Home Assistant 2025.1 lub nowszy",
+        "Home Assistant 2025.4 lub nowszy",
         "Encja weather z prognozą",
         "Zawory lub sekcje sterownika w Home Assistant",
         "Pomocnik Tekst (trwały bilans wody)"
