@@ -130,31 +130,6 @@
       ],
       "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Froboty_sprzatajace.yaml",
       "licencja": "MIT"
-    },
-    {
-      "id": "x20-konserwacja",
-      "kategoria": "dom",
-      "nazwa": "Xiaomi X20 Max – powiadomienia o konserwacji",
-      "wersja": "1.1.0",
-      "min_ha": "2024.10.0",
-      "krotki_opis": "Powiadomienie, gdy stacja zgłosi problem, robot zniknie z sieci albo trzeba uzupełnić detergent lub wymienić część.",
-      "opis": [
-        "Trwały problem stacji, niedostępność robota.",
-        "Niski poziom detergentu i zużycie mopów, filtra, szczotek i worka.",
-        "Jedna automatyzacja na robota."
-      ],
-      "wymagania": [
-        "Home Assistant 2024.10 lub nowszy",
-        "Xiaomi Robot Vacuum X20 Max",
-        "Integracja Xiaomi X20 Max"
-      ],
-      "blueprint_url": "https://github.com/SmartServicePL/xiaomi-x20-max/blob/main/blueprints/automation/SmartServicePL/x20_max_maintenance.yaml",
-      "dokumentacja": "https://github.com/SmartServicePL/xiaomi-x20-max/blob/main/README_PL.md",
-      "zrzut": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/x20-konserwacja.png",
-      "repozytorium": "https://github.com/SmartServicePL/xiaomi-x20-max",
-      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fxiaomi-x20-max%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FSmartServicePL%2Fx20_max_maintenance.yaml",
-      "licencja": "MIT",
-      "linki_dodatkowe": []
     }
   ]
 }

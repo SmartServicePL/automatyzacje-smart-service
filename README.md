@@ -17,7 +17,6 @@ Gotowe automatyzacje (blueprinty) Home Assistant do ogrodu i domu. Przygotowane 
 | Automatyzacja | Dla kogo | Import |
 |---|---|---|
 | [Robot sprzątający pod nieobecność – każda marka](docs/roboty-sprzatajace.md) | Każdy robot z encją `vacuum` (Roborock, Ecovacs, Dreame, Xiaomi, Matter i inne) | [![Importuj](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Froboty_sprzatajace.yaml) |
-| [Xiaomi X20 Max – powiadomienia o konserwacji](https://github.com/SmartServicePL/xiaomi-x20-max) | Xiaomi Robot Vacuum X20 Max z integracją Xiaomi X20 Max | [![Importuj](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fxiaomi-x20-max%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FSmartServicePL%2Fx20_max_maintenance.yaml) |
 
 Masz robota Dreame? Zobacz też [Dreame Scheduler](https://github.com/botts7/dreame-scheduler) autorstwa botts7 (MIT).
 
