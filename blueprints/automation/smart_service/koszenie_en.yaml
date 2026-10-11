@@ -1,0 +1,680 @@
+blueprint:
+  name: Smart Service - automatic lawn mowing
+  description: |
+    Universal, safe starting of a robotic lawn mower from Home Assistant
+    (any integration that provides a lawn_mower entity, e.g. Husqvarna Automower,
+    Worx Landroid, Segway Navimow, Gardena, Mammotion, Ecovacs GOAT).
+
+    The mower starts when all of the following are true:
+    - the mower is docked and its battery is charged enough,
+    - the set interval since the last mowing has passed (date helper),
+    - it is not raining and the grass drying time since the last rain has passed (optional),
+    - the hourly forecast shows no rain in the next few hours (optional),
+    - the temperature is within the allowed range and there is no dew (optional),
+    - no block is switched on (optional).
+
+    By default, mowing is not limited to any hours or days. In the "Schedule"
+    and "Safety" sections you can enable: selected weekdays, a time window,
+    mowing in daylight only (sun elevation) and holding off while someone is
+    in the garden. Mowing in daylight only protects hedgehogs, which forage after dark.
+
+    While mowing: rain sends the mower back to its base, someone entering the garden
+    pauses the mower or sends it back (if enabled), and an error, a long pause,
+    a lost connection or mowing for too long send one notification per event.
+
+    Requirements:
+    - an input_datetime helper (date and time) "Earliest next mowing",
+    - the schedule in the manufacturer's app turned off (otherwise the mower will also mow on its own).
+  domain: automation
+  author: Smart Service
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/koszenie_en.yaml
+  input:
+    kosiarka_sekcja:
+      name: Mower
+      icon: mdi:robot-mower
+      input:
+        kosiarka:
+          name: Mower
+          description: The lawn_mower entity of the robotic mower.
+          selector:
+            entity:
+              filter:
+                - domain: lawn_mower
+        bateria:
+          name: Mower battery (optional)
+          description: Battery level sensor in percent. Empty = battery is not checked.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: battery
+        min_bateria:
+          name: Minimum battery to start
+          default: 60
+          selector:
+            number:
+              min: 10
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        pomocnik_nastepne:
+          name: Helper - earliest next mowing
+          description: >-
+            An input_datetime helper with date and time. The automation itself stores
+            in it the earliest time mowing is allowed again (after mowing and after a failed start).
+          selector:
+            entity:
+              filter:
+                - domain: input_datetime
+    harmonogram_sekcja:
+      name: Schedule
+      icon: mdi:calendar-clock
+      input:
+        ogranicz_dni:
+          name: Mow only on selected days
+          description: Off = mowing on every day of the week.
+          default: false
+          selector:
+            boolean: {}
+        dni:
+          name: Mowing days
+          description: Used only when the option above is turned on.
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Monday
+                  value: mon
+                - label: Tuesday
+                  value: tue
+                - label: Wednesday
+                  value: wed
+                - label: Thursday
+                  value: thu
+                - label: Friday
+                  value: fri
+                - label: Saturday
+                  value: sat
+                - label: Sunday
+                  value: sun
+        ogranicz_godziny:
+          name: Mow only during selected hours
+          description: Off = start at any time of day.
+          default: false
+          selector:
+            boolean: {}
+        okno_od:
+          name: Mowing window start
+          description: Used only when the option above is turned on. The window may span midnight (e.g. 22:00-05:00).
+          default: "09:00:00"
+          selector:
+            time: {}
+        okno_do:
+          name: Mowing window end (latest start)
+          description: Used only when "Mow only during selected hours" is turned on.
+          default: "17:00:00"
+          selector:
+            time: {}
+        odstep_godz:
+          name: Interval between mowings
+          description: After a confirmed mowing (also one started manually), the next one starts no sooner than after this many hours.
+          default: 44
+          selector:
+            number:
+              min: 6
+              max: 336
+              step: 1
+              unit_of_measurement: h
+              mode: box
+        ponowienie_godz:
+          name: Retry after a failed or interrupted start
+          default: 2
+          selector:
+            number:
+              min: 0.5
+              max: 24
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        min_czas_koszenia_min:
+          name: Mowing counts as done after
+          description: How many minutes the mower must mow without a break for the mowing to count as done.
+          default: 20
+          selector:
+            number:
+              min: 5
+              max: 120
+              step: 5
+              unit_of_measurement: min
+              mode: slider
+    pogoda_sekcja:
+      name: Weather
+      icon: mdi:weather-partly-rainy
+      input:
+        czujniki_deszczu:
+          name: Rain sensors (optional)
+          description: >-
+            Rain binary sensors (weather station, mower sensor). State "on" = it is raining.
+            The drying time counts from the last change of a sensor to "off".
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+        schniecie_godz:
+          name: Grass drying time after rain
+          default: 3
+          selector:
+            number:
+              min: 0
+              max: 12
+              step: 0.5
+              unit_of_measurement: h
+              mode: slider
+        prognoza:
+          name: Weather forecast (optional)
+          description: A weather entity with an hourly forecast. Empty = forecast is not checked.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: weather
+        prognoza_godz:
+          name: How many hours ahead to check the forecast
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 8
+              step: 1
+              unit_of_measurement: h
+              mode: slider
+        max_opad_mm:
+          name: Maximum forecast rainfall in that time
+          default: 0.2
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 0.1
+              unit_of_measurement: mm
+              mode: box
+        max_prawdopodobienstwo:
+          name: Maximum probability of rain
+          default: 60
+          selector:
+            number:
+              min: 10
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        temperatura:
+          name: Outdoor temperature (optional)
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: temperature
+        min_temp:
+          name: Minimum mowing temperature
+          description: Protects the grass from being mowed during a frost and right after it.
+          default: 8
+          selector:
+            number:
+              min: 0
+              max: 20
+              step: 1
+              unit_of_measurement: "°C"
+              mode: slider
+        max_temp:
+          name: Maximum mowing temperature
+          default: 30
+          selector:
+            number:
+              min: 20
+              max: 40
+              step: 1
+              unit_of_measurement: "°C"
+              mode: slider
+        wilgotnosc:
+          name: Air humidity (optional)
+          description: Together with the temperature, detects dew (dew point). Also requires the temperature sensor.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: humidity
+        min_roznica_rosy:
+          name: Minimum difference between temperature and dew point
+          default: 2.5
+          selector:
+            number:
+              min: 0.5
+              max: 6
+              step: 0.5
+              unit_of_measurement: "°C"
+              mode: slider
+    bezpieczenstwo_sekcja:
+      name: Safety
+      icon: mdi:shield-check
+      input:
+        tylko_za_dnia:
+          name: Mow only in daylight
+          description: >-
+            Start only when the sun is above the horizon (sun.sun entity).
+            Recommended: hedgehogs and other small animals forage after dark.
+          default: false
+          selector:
+            boolean: {}
+        slonce_min:
+          name: Minimum sun elevation
+          description: Used only when "Mow only in daylight" is turned on. 3° is about 20 minutes after sunrise and before sunset.
+          default: 3
+          selector:
+            number:
+              min: -6
+              max: 30
+              step: 1
+              unit_of_measurement: "°"
+              mode: slider
+        sprawdzaj_ogrod:
+          name: Do not mow while someone is in the garden
+          default: false
+          selector:
+            boolean: {}
+        czujniki_ogrodu:
+          name: Sensors for "someone in the garden"
+          description: >-
+            Motion or presence sensors in the garden, a gate, a "children/dogs in the garden" switch.
+            State "on" = someone is there. Used only when the option above is turned on.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+                - domain: input_boolean
+        reakcja_ogrod:
+          name: When someone enters the garden during mowing
+          default: dock
+          selector:
+            select:
+              options:
+                - label: Send the mower back to its base
+                  value: dock
+                - label: Pause the mower on the lawn
+                  value: pause
+                - label: Do nothing
+                  value: none
+        blokady:
+          name: Blocks (optional)
+          description: Switches or sensors whose "on" state blocks mowing (e.g. a party, vacation, public holiday).
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: input_boolean
+                - domain: binary_sensor
+                - domain: switch
+    nadzor_sekcja:
+      name: Monitoring and notifications
+      icon: mdi:bell-alert
+      input:
+        deszcz_do_bazy:
+          name: Send back to the base when it starts raining
+          default: true
+          selector:
+            boolean: {}
+        pauza_alarm_min:
+          name: Notify about a pause lasting longer than
+          default: 30
+          selector:
+            number:
+              min: 5
+              max: 240
+              step: 5
+              unit_of_measurement: min
+              mode: slider
+        max_czas_koszenia_godz:
+          name: Notify about mowing lasting longer than
+          default: 6
+          selector:
+            number:
+              min: 1
+              max: 24
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        powiadom_o_starcie:
+          name: Also notify about starts and about stops caused by rain or people in the garden
+          default: false
+          selector:
+            boolean: {}
+        akcje_powiadomien:
+          name: Notification actions
+          description: >-
+            Actions run for every notification, e.g. notify.mobile_app_phone.
+            Available variables: {{ tytul }} (title) and {{ tresc }} (message). Empty = no notifications.
+          default: []
+          selector:
+            action: {}
+
+mode: queued
+max: 10
+max_exceeded: silent
+trace:
+  stored_traces: 20
+
+triggers:
+  - trigger: time
+    at: !input okno_od
+    id: sprawdz
+  - trigger: time_pattern
+    minutes: "/10"
+    id: sprawdz
+  - trigger: state
+    entity_id: !input kosiarka
+    to: mowing
+    for:
+      minutes: !input min_czas_koszenia_min
+    id: koszenie_potwierdzone
+  - trigger: state
+    entity_id: !input czujniki_deszczu
+    from: "off"
+    to: "on"
+    id: deszcz
+  - trigger: state
+    entity_id: !input czujniki_ogrodu
+    from: "off"
+    to: "on"
+    id: ogrod
+  - trigger: state
+    entity_id: !input kosiarka
+    to: error
+    for:
+      minutes: 2
+    id: blad
+  - trigger: state
+    entity_id: !input kosiarka
+    to: paused
+    for:
+      minutes: !input pauza_alarm_min
+    id: pauza
+  - trigger: state
+    entity_id: !input kosiarka
+    to: unavailable
+    for:
+      minutes: 30
+    id: niedostepna
+  - trigger: state
+    entity_id: !input kosiarka
+    to: mowing
+    for:
+      hours: !input max_czas_koszenia_godz
+    id: za_dlugo
+
+variables:
+  kosiarka: !input kosiarka
+  bateria: !input bateria
+  min_bateria: !input min_bateria
+  pomocnik_nastepne: !input pomocnik_nastepne
+  odstep_godz: !input odstep_godz
+  ponowienie_godz: !input ponowienie_godz
+  czujniki_deszczu: !input czujniki_deszczu
+  schniecie_godz: !input schniecie_godz
+  prognoza: !input prognoza
+  prognoza_godz: !input prognoza_godz
+  max_opad_mm: !input max_opad_mm
+  max_prawdopodobienstwo: !input max_prawdopodobienstwo
+  temperatura: !input temperatura
+  min_temp: !input min_temp
+  max_temp: !input max_temp
+  wilgotnosc: !input wilgotnosc
+  min_roznica_rosy: !input min_roznica_rosy
+  ogranicz_dni: !input ogranicz_dni
+  dni: !input dni
+  ogranicz_godziny: !input ogranicz_godziny
+  okno_od: !input okno_od
+  okno_do: !input okno_do
+  tylko_za_dnia: !input tylko_za_dnia
+  slonce_min: !input slonce_min
+  sprawdzaj_ogrod: !input sprawdzaj_ogrod
+  czujniki_ogrodu: !input czujniki_ogrodu
+  max_czas_koszenia_godz: !input max_czas_koszenia_godz
+  reakcja_ogrod: !input reakcja_ogrod
+  blokady: !input blokady
+  deszcz_do_bazy: !input deszcz_do_bazy
+  powiadom_o_starcie: !input powiadom_o_starcie
+  nazwa: "{{ state_attr(kosiarka, 'friendly_name') or kosiarka }}"
+  # Empty text = all start conditions are met (except the forecast, which is checked separately).
+  powod_blokady: >-
+    {%- set brak = ['unknown', 'unavailable', 'none', ''] -%}
+    {%- set teraz = now().timestamp() -%}
+    {%- set nastepne = state_attr(pomocnik_nastepne, 'timestamp') | float(0) -%}
+    {%- set t = states(temperatura) | float(none) if temperatura else none -%}
+    {%- set rh = states(wilgotnosc) | float(none) if wilgotnosc else none -%}
+    {%- set spread = none -%}
+    {%- if t is not none and rh is not none and rh > 0 -%}
+      {%- set g = (([rh, 100] | min) / 100) | log + 17.62 * t / (243.12 + t) -%}
+      {%- set spread = t - 243.12 * g / (17.62 - g) -%}
+    {%- endif -%}
+    {%- set dzien = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][now().weekday()] -%}
+    {%- set od = today_at(okno_od) -%}
+    {%- set do = today_at(okno_do) -%}
+    {%- set w_oknie = (od <= now() < do) if od <= do else (now() >= od or now() < do) -%}
+    {%- set ns = namespace(deszcz=false, mokro=0, ogrod=false, blokada=false) -%}
+    {%- for e in czujniki_deszczu -%}
+      {%- set s = states[e] -%}
+      {%- if s is not none and s.state == 'on' -%}
+        {%- set ns.deszcz = true -%}
+      {%- elif s is not none and s.state == 'off' -%}
+        {%- set do_suchej = s.last_changed.timestamp() + (schniecie_godz | float(3)) * 3600 -%}
+        {%- if do_suchej > teraz and do_suchej > ns.mokro -%}
+          {%- set ns.mokro = do_suchej -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- for e in czujniki_ogrodu -%}
+      {%- if is_state(e, 'on') -%}{%- set ns.ogrod = true -%}{%- endif -%}
+    {%- endfor -%}
+    {%- for e in blokady -%}
+      {%- if is_state(e, 'on') -%}{%- set ns.blokada = true -%}{%- endif -%}
+    {%- endfor -%}
+    {%- if ogranicz_dni and dzien not in dni -%}
+      today is not a mowing day
+    {%- elif ogranicz_godziny and not w_oknie -%}
+      outside the mowing window {{ okno_od[:5] }}-{{ okno_do[:5] }}
+    {%- elif not is_state(kosiarka, 'docked') -%}
+      the mower is not docked (state: {{ states(kosiarka) }})
+    {%- elif nastepne > teraz -%}
+      too early, next mowing from {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+    {%- elif bateria and states(bateria) in brak -%}
+      no battery reading
+    {%- elif bateria and states(bateria) | float(0) < min_bateria | float(0) -%}
+      battery {{ states(bateria) }}%, minimum {{ min_bateria | int }}%
+    {%- elif ns.deszcz -%}
+      raining
+    {%- elif ns.mokro > 0 -%}
+      the grass is drying after rain until {{ ns.mokro | timestamp_custom('%H:%M') }}
+    {%- elif temperatura and t is none -%}
+      no temperature reading
+    {%- elif t is not none and (t < min_temp | float or t > max_temp | float) -%}
+      temperature {{ t }} °C outside the range {{ min_temp | int }}-{{ max_temp | int }} °C
+    {%- elif spread is not none and spread < min_roznica_rosy | float -%}
+      dew on the grass (humidity {{ rh | round(0) | int }}%)
+    {%- elif tylko_za_dnia and state_attr('sun.sun', 'elevation') is none -%}
+      no sun.sun entity - cannot check whether it is light outside
+    {%- elif tylko_za_dnia and state_attr('sun.sun', 'elevation') | float < slonce_min | float -%}
+      too dark (sun at {{ state_attr('sun.sun', 'elevation') | round(0) | int }}°)
+    {%- elif sprawdzaj_ogrod and ns.ogrod -%}
+      someone is in the garden
+    {%- elif ns.blokada -%}
+      a mowing block is on
+    {%- endif -%}
+
+actions:
+  - choose:
+      - alias: Check the conditions and start mowing
+        conditions:
+          - condition: trigger
+            id: sprawdz
+          - condition: template
+            value_template: "{{ powod_blokady | trim == '' }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ prognoza | length > 0 }}"
+            then:
+              - action: weather.get_forecasts
+                continue_on_error: true
+                target:
+                  entity_id: "{{ prognoza }}"
+                data:
+                  type: hourly
+                response_variable: odpowiedz
+              - variables:
+                  ocena_prognozy: >-
+                    {%- set lista = (odpowiedz[prognoza].forecast
+                        if odpowiedz is defined and odpowiedz is mapping
+                           and odpowiedz.get(prognoza) is mapping
+                        else []) or [] -%}
+                    {%- set od = now().timestamp() - 3600 -%}
+                    {%- set do = now().timestamp() + (prognoza_godz | float(3)) * 3600 -%}
+                    {%- set ns = namespace(n=0, opad=0, p=0) -%}
+                    {%- for g in lista if g is mapping -%}
+                      {%- set ts = as_timestamp(g.get('datetime'), 0) -%}
+                      {%- if ts > od and ts <= do -%}
+                        {%- set ns.n = ns.n + 1 -%}
+                        {%- set ns.opad = ns.opad + (g.get('precipitation') | float(0)) -%}
+                        {%- set ns.p = [ns.p, g.get('precipitation_probability') | float(0)] | max -%}
+                      {%- endif -%}
+                    {%- endfor -%}
+                    {%- if ns.n == 0 -%}brak
+                    {%- elif ns.opad > max_opad_mm | float or ns.p > max_prawdopodobienstwo | float -%}deszcz
+                    {%- else -%}ok{%- endif -%}
+              - alias: Without an hourly forecast, start only if there are rain sensors
+                condition: template
+                value_template: >-
+                  {{ ocena_prognozy == 'ok'
+                     or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0) }}
+          - action: lawn_mower.start_mowing
+            target:
+              entity_id: !input kosiarka
+          - wait_template: "{{ not is_state(kosiarka, 'docked') and states(kosiarka) not in ['unknown', 'unavailable'] }}"
+            timeout:
+              minutes: 5
+            continue_on_timeout: true
+          - alias: Do not start again until mowing is confirmed
+            action: input_datetime.set_datetime
+            target:
+              entity_id: !input pomocnik_nastepne
+            data:
+              timestamp: "{{ (now().timestamp() + (ponowienie_godz | float(2)) * 3600) | int }}"
+          - if:
+              - condition: template
+                value_template: "{{ not wait.completed }}"
+            then:
+              - variables:
+                  tytul: "{{ nazwa }}: did not start"
+                  tresc: >-
+                    The mower did not leave its base after the start command (state: {{ states(kosiarka) }}).
+                    Next attempt at the earliest in {{ ponowienie_godz }} h.
+              - sequence: !input akcje_powiadomien
+            else:
+              - if:
+                  - condition: template
+                    value_template: "{{ powiadom_o_starcie }}"
+                then:
+                  - variables:
+                      tytul: "{{ nazwa }}: mowing started"
+                      tresc: The mower left its base at {{ now().strftime('%H:%M') }}.
+                  - sequence: !input akcje_powiadomien
+
+      - alias: Mowing confirmed - set the next date
+        conditions:
+          - condition: trigger
+            id: koszenie_potwierdzone
+        sequence:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: !input pomocnik_nastepne
+            data:
+              timestamp: "{{ (now().timestamp() + (odstep_godz | float(44)) * 3600) | int }}"
+
+      - alias: Rain during mowing
+        conditions:
+          - condition: trigger
+            id: deszcz
+          - condition: template
+            value_template: "{{ deszcz_do_bazy and states(kosiarka) in ['mowing', 'paused'] }}"
+        sequence:
+          - action: lawn_mower.dock
+            target:
+              entity_id: !input kosiarka
+          - if:
+              - condition: template
+                value_template: "{{ powiadom_o_starcie }}"
+            then:
+              - variables:
+                  tytul: "{{ nazwa }}: returning to base"
+                  tresc: It started raining - the mower is returning to its base. Mowing will resume once the grass has dried.
+              - sequence: !input akcje_powiadomien
+
+      - alias: Someone entered the garden during mowing
+        conditions:
+          - condition: trigger
+            id: ogrod
+          - condition: template
+            value_template: "{{ sprawdzaj_ogrod and reakcja_ogrod != 'none' and is_state(kosiarka, 'mowing') }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ reakcja_ogrod == 'pause' }}"
+            then:
+              - action: lawn_mower.pause
+                target:
+                  entity_id: !input kosiarka
+            else:
+              - action: lawn_mower.dock
+                target:
+                  entity_id: !input kosiarka
+          - if:
+              - condition: template
+                value_template: "{{ powiadom_o_starcie }}"
+            then:
+              - variables:
+                  tytul: "{{ nazwa }}: mowing stopped"
+                  tresc: >-
+                    Someone is in the garden - the mower
+                    {{ 'is waiting on the lawn (resume it manually)' if reakcja_ogrod == 'pause' else 'is returning to its base' }}.
+              - sequence: !input akcje_powiadomien
+
+      - alias: Mower problem - one notification per event
+        conditions:
+          - condition: trigger
+            id: [blad, pauza, niedostepna, za_dlugo]
+        sequence:
+          - variables:
+              tytul: "{{ nazwa }} needs attention"
+              tresc: >-
+                {%- set opis = state_attr(kosiarka, 'error_description') or state_attr(kosiarka, 'error') -%}
+                {%- if trigger.id == 'blad' -%}
+                  The mower reported an error{{ (': ' ~ opis) if opis else '' }}. Check it on the lawn.
+                {%- elif trigger.id == 'pauza' -%}
+                  The mower has been paused for {{ ((now() - states[kosiarka].last_changed).total_seconds() // 60) | int }} min.
+                {%- elif trigger.id == 'niedostepna' -%}
+                  No connection to the mower for 30 min. Check the base station power supply and the signal coverage.
+                {%- else -%}
+                  The mower has been mowing without a break for more than {{ max_czas_koszenia_godz }} h. Check whether it is stuck.
+                {%- endif -%}
+          - sequence: !input akcje_powiadomien
