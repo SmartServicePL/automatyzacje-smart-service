@@ -1,0 +1,585 @@
+blueprint:
+  name: Smart Service - robot sprzątający pod nieobecność
+  description: |
+    Uniwersalne sprzątanie robotem odkurzającym lub mopującym z Home Assistant
+    (dowolna integracja z encją vacuum, np. Roborock, Ecovacs, Dreame, Xiaomi, Matter).
+    Jedna automatyzacja = jeden robot. Dla kilku pięter lub robotów utwórz kilka
+    automatyzacji z tego blueprintu (każda z własnym pomocnikiem).
+
+    Robot startuje, gdy jednocześnie:
+    - nikogo nie ma w domu od ustawionego czasu (albo wybrano tryb bez obecności),
+    - robot stoi w stacji z wystarczającą baterią,
+    - minął ustawiony odstęp od ostatniego sprzątania (pomocnik z datą),
+    - opcjonalny licznik potrzeby (np. "brud", użycia kuwety) osiągnął próg,
+    - żadna blokada nie jest włączona.
+
+    Domyślnie sprzątanie nie ma ograniczeń dni ani godzin. Wybrane dni tygodnia
+    i okno godzin można włączyć w sekcji "Harmonogram i obecność".
+
+    Sprzątanie wybranych pomieszczeń używa akcji vacuum.clean_area (Home Assistant
+    2026.3 lub nowszy, segmenty mapy muszą być przypisane do obszarów w ustawieniach
+    encji robota). Bez wybranych obszarów robot sprząta cały dom (vacuum.start).
+    Dla integracji bez obsługi obszarów można podać własne akcje startu.
+
+    Nadzór: gdy ktoś wróci do domu, robot wraca do stacji albo pauzuje; błąd,
+    długa pauza, brak łączności i zbyt długie sprzątanie wysyłają jedno
+    powiadomienie na zdarzenie.
+  domain: automation
+  author: Smart Service
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/roboty_sprzatajace.yaml
+  input:
+    robot_sekcja:
+      name: Robot
+      icon: mdi:robot-vacuum
+      input:
+        robot:
+          name: Robot
+          selector:
+            entity:
+              filter:
+                - domain: vacuum
+        bateria:
+          name: Bateria robota (opcjonalnie)
+          description: Sensor baterii w procentach. Puste = bez sprawdzania baterii.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: battery
+        min_bateria:
+          name: Minimalna bateria do startu
+          default: 40
+          selector:
+            number:
+              min: 10
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        start_takze_z_idle:
+          name: Dopuszczaj start także ze stanu "bezczynny"
+          description: Niektóre roboty po naładowaniu raportują "idle" zamiast "docked". Włącz tylko, jeśli Twój robot tak robi.
+          default: false
+          selector:
+            boolean: {}
+        pomocnik_nastepne:
+          name: Pomocnik - najwcześniejsze następne sprzątanie
+          description: >-
+            Pomocnik input_datetime z datą i godziną. Automatyzacja sama zapisuje
+            w nim, kiedy najwcześniej wolno znowu sprzątać.
+          selector:
+            entity:
+              filter:
+                - domain: input_datetime
+    zakres_sekcja:
+      name: Co sprzątać
+      icon: mdi:floor-plan
+      input:
+        obszary:
+          name: Obszary do sprzątania (opcjonalnie)
+          description: >-
+            Obszary Home Assistant przypisane do segmentów mapy robota. Puste = cały dom.
+            Wymaga Home Assistant 2026.3+ i robota z obsługą "Sprzątaj obszar".
+          default: []
+          selector:
+            area:
+              multiple: true
+        wlasny_start:
+          name: Użyj własnych akcji startu zamiast standardowych
+          default: false
+          selector:
+            boolean: {}
+        akcje_startu:
+          name: Własne akcje startu (opcjonalnie)
+          description: Np. usługa integracji producenta z listą pokoi i trybem mopowania. Używane tylko po włączeniu opcji powyżej.
+          default: []
+          selector:
+            action: {}
+    harmonogram_sekcja:
+      name: Harmonogram i obecność
+      icon: mdi:calendar-clock
+      input:
+        ogranicz_dni:
+          name: Sprzątać tylko w wybrane dni
+          description: Wyłączone = sprzątanie w każdy dzień tygodnia.
+          default: false
+          selector:
+            boolean: {}
+        dni:
+          name: Dni sprzątania
+          description: Używane tylko po włączeniu opcji powyżej.
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Poniedziałek
+                  value: mon
+                - label: Wtorek
+                  value: tue
+                - label: Środa
+                  value: wed
+                - label: Czwartek
+                  value: thu
+                - label: Piątek
+                  value: fri
+                - label: Sobota
+                  value: sat
+                - label: Niedziela
+                  value: sun
+        ogranicz_godziny:
+          name: Sprzątać tylko w wybranych godzinach
+          description: Wyłączone = start o dowolnej porze doby.
+          default: false
+          selector:
+            boolean: {}
+        okno_od:
+          name: Początek okna sprzątania
+          description: Używane tylko po włączeniu opcji powyżej. Okno może przechodzić przez północ.
+          default: "09:00:00"
+          selector:
+            time: {}
+        okno_do:
+          name: Koniec okna sprzątania (najpóźniejszy start)
+          description: Używane tylko po włączeniu opcji "Sprzątać tylko w wybranych godzinach".
+          default: "16:00:00"
+          selector:
+            time: {}
+        odstep_godz:
+          name: Odstęp między sprzątaniami
+          default: 44
+          selector:
+            number:
+              min: 4
+              max: 336
+              step: 1
+              unit_of_measurement: h
+              mode: box
+        ponowienie_godz:
+          name: Ponowienie po nieudanym lub przerwanym sprzątaniu
+          default: 3
+          selector:
+            number:
+              min: 0.5
+              max: 24
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        min_czas_sprzatania_min:
+          name: Sprzątanie uznane za wykonane po
+          description: Ile minut robot musi sprzątać bez przerwy, żeby uznać sprzątanie za wykonane.
+          default: 15
+          selector:
+            number:
+              min: 3
+              max: 120
+              step: 1
+              unit_of_measurement: min
+              mode: slider
+        tryb_obecnosci:
+          name: Kiedy sprzątać
+          default: pusty_dom
+          selector:
+            select:
+              options:
+                - label: Tylko gdy nikogo nie ma w domu
+                  value: pusty_dom
+                - label: W oknie czasowym, bez względu na obecność
+                  value: zawsze
+        obecnosc:
+          name: Domownicy i czujniki obecności
+          description: >-
+            Osoby (person), urządzenia (device_tracker), grupy lub czujniki obecności
+            (stan "on" = ktoś jest). Stan nieznany traktowany jest jak obecność.
+            Nie wybieraj czujników ruchu w pomieszczeniach ze zwierzętami.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: person
+                - domain: device_tracker
+                - domain: group
+                - domain: binary_sensor
+                - domain: input_boolean
+        opoznienie_min:
+          name: Start po tylu minutach pustego domu
+          default: 10
+          selector:
+            number:
+              min: 0
+              max: 120
+              step: 5
+              unit_of_measurement: min
+              mode: slider
+        reakcja_powrot:
+          name: Gdy ktoś wróci podczas sprzątania
+          default: dock
+          selector:
+            select:
+              options:
+                - label: Odeślij robota do stacji (dokończy później)
+                  value: dock
+                - label: Wstrzymaj robota
+                  value: pause
+                - label: Sprzątaj dalej
+                  value: none
+        potrzeba:
+          name: Licznik potrzeby sprzątania (opcjonalnie)
+          description: Np. input_number "brud" albo licznik użyć kuwety. Start dopiero od progu poniżej.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: counter
+                - domain: sensor
+        prog_potrzeby:
+          name: Próg licznika potrzeby
+          default: 100
+          selector:
+            number:
+              min: 1
+              max: 1000
+              step: 1
+              mode: box
+        blokady:
+          name: Blokady (opcjonalnie)
+          description: Przełączniki lub czujniki, których stan "on" blokuje sprzątanie (goście, urlop, drzwi otwarte).
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: input_boolean
+                - domain: binary_sensor
+                - domain: switch
+    nadzor_sekcja:
+      name: Nadzór i powiadomienia
+      icon: mdi:bell-alert
+      input:
+        pauza_alarm_min:
+          name: Powiadom o pauzie trwającej dłużej niż
+          default: 20
+          selector:
+            number:
+              min: 5
+              max: 240
+              step: 5
+              unit_of_measurement: min
+              mode: slider
+        max_czas_godz:
+          name: Limit czasu sprzątania (potem powrót do stacji)
+          default: 4
+          selector:
+            number:
+              min: 0.5
+              max: 12
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        akcje_po_sprzataniu:
+          name: Akcje po wykonanym sprzątaniu (opcjonalnie)
+          description: Np. wyzerowanie licznika potrzeby. Wykonywane, gdy sprzątanie zostanie uznane za wykonane.
+          default: []
+          selector:
+            action: {}
+        powiadom_o_starcie:
+          name: Powiadamiaj także o starcie i przerwaniu z powodu powrotu domowników
+          default: false
+          selector:
+            boolean: {}
+        akcje_powiadomien:
+          name: Akcje powiadomienia
+          description: >-
+            Akcje wykonywane przy każdym powiadomieniu, np. notify.mobile_app_telefon.
+            Dostępne zmienne: {{ tytul }} i {{ tresc }}. Puste = bez powiadomień.
+          default: []
+          selector:
+            action: {}
+
+mode: queued
+max: 10
+max_exceeded: silent
+trace:
+  stored_traces: 20
+
+triggers:
+  - trigger: time
+    at: !input okno_od
+    id: sprawdz
+  - trigger: time_pattern
+    minutes: "/10"
+    id: sprawdz
+  - trigger: state
+    entity_id: !input obecnosc
+    to: ~
+    id: obecnosc
+  - trigger: state
+    entity_id: !input robot
+    to: cleaning
+    for:
+      minutes: !input min_czas_sprzatania_min
+    id: sprzatanie_potwierdzone
+  - trigger: state
+    entity_id: !input robot
+    to: error
+    for:
+      minutes: 1
+    id: blad
+  - trigger: state
+    entity_id: !input robot
+    to: paused
+    for:
+      minutes: !input pauza_alarm_min
+    id: pauza
+  - trigger: state
+    entity_id: !input robot
+    to: unavailable
+    for:
+      minutes: 30
+    id: niedostepny
+  - trigger: state
+    entity_id: !input robot
+    to: cleaning
+    for:
+      hours: !input max_czas_godz
+    id: za_dlugo
+
+variables:
+  robot: !input robot
+  bateria: !input bateria
+  min_bateria: !input min_bateria
+  start_takze_z_idle: !input start_takze_z_idle
+  pomocnik_nastepne: !input pomocnik_nastepne
+  obszary: !input obszary
+  wlasny_start: !input wlasny_start
+  odstep_godz: !input odstep_godz
+  ponowienie_godz: !input ponowienie_godz
+  tryb_obecnosci: !input tryb_obecnosci
+  obecnosc: !input obecnosc
+  opoznienie_min: !input opoznienie_min
+  reakcja_powrot: !input reakcja_powrot
+  potrzeba: !input potrzeba
+  prog_potrzeby: !input prog_potrzeby
+  blokady: !input blokady
+  powiadom_o_starcie: !input powiadom_o_starcie
+  ogranicz_dni: !input ogranicz_dni
+  dni: !input dni
+  ogranicz_godziny: !input ogranicz_godziny
+  okno_od: !input okno_od
+  okno_do: !input okno_do
+  max_czas_godz: !input max_czas_godz
+  nazwa: "{{ state_attr(robot, 'friendly_name') or robot }}"
+  ktos_w_domu: >-
+    {%- set ns = namespace(dom=false) -%}
+    {%- for e in obecnosc -%}
+      {%- set s = states[e] -%}
+      {%- set d = e.split('.')[0] -%}
+      {%- if s is none or s.state in ['unknown', 'unavailable'] -%}
+        {%- set ns.dom = true -%}
+      {%- elif d in ['person', 'device_tracker'] and s.state == 'home' -%}
+        {%- set ns.dom = true -%}
+      {%- elif d in ['binary_sensor', 'input_boolean'] and s.state == 'on' -%}
+        {%- set ns.dom = true -%}
+      {%- elif d == 'group' and s.state in ['home', 'on'] -%}
+        {%- set ns.dom = true -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ns.dom }}
+  minut_pustego_domu: >-
+    {%- set ns = namespace(ost=0) -%}
+    {%- for e in obecnosc -%}
+      {%- set s = states[e] -%}
+      {%- if s is not none and s.last_changed.timestamp() > ns.ost -%}
+        {%- set ns.ost = s.last_changed.timestamp() -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ((now().timestamp() - ns.ost) / 60) | round(0) | int if ns.ost > 0 else 0 }}
+  powod_blokady: >-
+    {%- set teraz = now().timestamp() -%}
+    {%- set nastepne = state_attr(pomocnik_nastepne, 'timestamp') | float(0) -%}
+    {%- set stany_startu = ['docked', 'idle'] if start_takze_z_idle else ['docked'] -%}
+    {%- set dzien = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][now().weekday()] -%}
+    {%- set od = today_at(okno_od) -%}
+    {%- set do = today_at(okno_do) -%}
+    {%- set w_oknie = (od <= now() < do) if od <= do else (now() >= od or now() < do) -%}
+    {%- set ns = namespace(blokada=false) -%}
+    {%- for e in blokady -%}
+      {%- if is_state(e, 'on') -%}{%- set ns.blokada = true -%}{%- endif -%}
+    {%- endfor -%}
+    {%- if ogranicz_dni and dzien not in dni -%}
+      dziś nie jest dniem sprzątania
+    {%- elif ogranicz_godziny and not w_oknie -%}
+      poza oknem sprzątania {{ okno_od[:5] }}-{{ okno_do[:5] }}
+    {%- elif not wlasny_start and obszary | length > 0
+          and not (state_attr(robot, 'supported_features') | int(0)) | bitwise_and(16384) -%}
+      robot nie obsługuje sprzątania obszarów - usuń obszary albo użyj własnych akcji startu
+    {%- elif states(robot) not in stany_startu -%}
+      robot nie stoi w stacji (stan: {{ states(robot) }})
+    {%- elif nastepne > teraz -%}
+      za wcześnie, najbliższe sprzątanie od {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+    {%- elif bateria and states(bateria) | float(-1) < 0 -%}
+      brak odczytu baterii
+    {%- elif bateria and states(bateria) | float(0) < min_bateria | float(0) -%}
+      bateria {{ states(bateria) }}%, minimum {{ min_bateria | int }}%
+    {%- elif tryb_obecnosci == 'pusty_dom' and obecnosc | length == 0 -%}
+      nie wybrano domowników, a tryb wymaga pustego domu
+    {%- elif tryb_obecnosci == 'pusty_dom' and ktos_w_domu | bool -%}
+      ktoś jest w domu
+    {%- elif tryb_obecnosci == 'pusty_dom' and minut_pustego_domu | int < opoznienie_min | int -%}
+      dom pusty dopiero od {{ minut_pustego_domu }} min
+    {%- elif potrzeba and states(potrzeba) | float(-1) < prog_potrzeby | float -%}
+      licznik potrzeby {{ states(potrzeba) }} poniżej progu {{ prog_potrzeby }}
+    {%- elif ns.blokada -%}
+      włączona blokada sprzątania
+    {%- endif -%}
+
+actions:
+  - choose:
+      - alias: Sprawdź warunki i uruchom sprzątanie
+        conditions:
+          - condition: trigger
+            id: sprawdz
+          - condition: template
+            value_template: "{{ powod_blokady | trim == '' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wlasny_start }}"
+                sequence: !input akcje_startu
+              - conditions:
+                  - condition: template
+                    value_template: "{{ obszary | length > 0 }}"
+                sequence:
+                  - action: vacuum.clean_area
+                    continue_on_error: true
+                    target:
+                      entity_id: !input robot
+                    data:
+                      cleaning_area_id: !input obszary
+            default:
+              - action: vacuum.start
+                continue_on_error: true
+                target:
+                  entity_id: !input robot
+          - wait_template: "{{ states(robot) in ['cleaning', 'returning', 'paused', 'error'] }}"
+            timeout:
+              minutes: 3
+            continue_on_timeout: true
+          - alias: Do potwierdzenia sprzątania nie startuj ponownie
+            action: input_datetime.set_datetime
+            target:
+              entity_id: !input pomocnik_nastepne
+            data:
+              timestamp: "{{ (now().timestamp() + (ponowienie_godz | float(3)) * 3600) | int }}"
+          - if:
+              - condition: template
+                value_template: "{{ not wait.completed }}"
+            then:
+              - variables:
+                  tytul: "{{ nazwa }}: nie wystartował"
+                  tresc: >-
+                    Robot nie rozpoczął sprzątania po komendzie startu (stan: {{ states(robot) }}).
+                    Następna próba najwcześniej za {{ ponowienie_godz }} h.
+              - sequence: !input akcje_powiadomien
+            else:
+              - if:
+                  - condition: template
+                    value_template: "{{ powiadom_o_starcie }}"
+                then:
+                  - variables:
+                      tytul: "{{ nazwa }}: sprzątanie rozpoczęte"
+                      tresc: Robot wyjechał ze stacji {{ now().strftime('%H:%M') }}.
+                  - sequence: !input akcje_powiadomien
+
+      - alias: Sprzątanie potwierdzone - wyznacz następny termin
+        conditions:
+          - condition: trigger
+            id: sprzatanie_potwierdzone
+        sequence:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: !input pomocnik_nastepne
+            data:
+              timestamp: "{{ (now().timestamp() + (odstep_godz | float(44)) * 3600) | int }}"
+          - sequence: !input akcje_po_sprzataniu
+
+      - alias: Domownik wrócił podczas sprzątania
+        conditions:
+          - condition: trigger
+            id: obecnosc
+          - condition: template
+            value_template: >-
+              {{ tryb_obecnosci == 'pusty_dom' and reakcja_powrot != 'none'
+                 and ktos_w_domu | bool and is_state(robot, 'cleaning') }}
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ reakcja_powrot == 'pause' }}"
+            then:
+              - action: vacuum.pause
+                target:
+                  entity_id: !input robot
+            else:
+              - action: vacuum.return_to_base
+                target:
+                  entity_id: !input robot
+              - alias: Dokończ później - krótki termin ponowienia
+                action: input_datetime.set_datetime
+                target:
+                  entity_id: !input pomocnik_nastepne
+                data:
+                  timestamp: "{{ (now().timestamp() + (ponowienie_godz | float(3)) * 3600) | int }}"
+          - if:
+              - condition: template
+                value_template: "{{ powiadom_o_starcie }}"
+            then:
+              - variables:
+                  tytul: "{{ nazwa }}: sprzątanie przerwane"
+                  tresc: >-
+                    Ktoś wrócił do domu - robot
+                    {{ 'czeka w miejscu (wznów go ręcznie)' if reakcja_powrot == 'pause' else 'wraca do stacji i dokończy później' }}.
+              - sequence: !input akcje_powiadomien
+
+      - alias: Limit czasu sprzątania
+        conditions:
+          - condition: trigger
+            id: za_dlugo
+        sequence:
+          - action: vacuum.return_to_base
+            target:
+              entity_id: !input robot
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: !input pomocnik_nastepne
+            data:
+              timestamp: "{{ (now().timestamp() + (ponowienie_godz | float(3)) * 3600) | int }}"
+          - variables:
+              tytul: "{{ nazwa }} wymaga uwagi"
+              tresc: >-
+                Robot sprząta dłużej niż {{ max_czas_godz }} h - wysłałem go do stacji.
+                Sprawdź, czy nie utknął.
+          - sequence: !input akcje_powiadomien
+
+      - alias: Problem z robotem - jedno powiadomienie na zdarzenie
+        conditions:
+          - condition: trigger
+            id: [blad, pauza, niedostepny]
+        sequence:
+          - variables:
+              tytul: "{{ nazwa }} wymaga uwagi"
+              tresc: >-
+                {%- set opis = state_attr(robot, 'error') or state_attr(robot, 'status') -%}
+                {%- if trigger.id == 'blad' -%}
+                  Robot zgłosił błąd{{ (': ' ~ opis) if opis else '' }}. Sprawdź robota i stację (zbiorniki wody, worek, szczotki).
+                {%- elif trigger.id == 'pauza' -%}
+                  Robot stoi wstrzymany od {{ ((now() - states[robot].last_changed).total_seconds() // 60) | int }} min.
+                {%- else -%}
+                  Brak łączności z robotem od 30 min. Sprawdź zasilanie stacji i Wi-Fi.
+                {%- endif -%}
+          - sequence: !input akcje_powiadomien

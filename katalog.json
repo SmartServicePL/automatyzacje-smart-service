@@ -1,0 +1,159 @@
+{
+  "wersja_schematu": 1,
+  "aktualizacja": "2026-10-11",
+  "nazwa": "Automatyzacje Smart Service",
+  "kategorie": [
+    {
+      "id": "ogrod",
+      "nazwa": "Ogród"
+    },
+    {
+      "id": "dom",
+      "nazwa": "Dom"
+    }
+  ],
+  "pozycje": [
+    {
+      "id": "koszenie-uniwersalne",
+      "kategoria": "ogrod",
+      "nazwa": "Automatyczne koszenie – każda kosiarka",
+      "wersja": "1.0.0",
+      "min_ha": "2024.10.0",
+      "krotki_opis": "Kosiarka rusza sama, gdy jest sucho, ciepło i minął odstęp od ostatniego koszenia. Deszcz odsyła ją do bazy.",
+      "opis": [
+        "Działa z każdą kosiarką z encją lawn_mower (Husqvarna, Worx, Segway, Gardena, Mammotion, Ecovacs i inne).",
+        "Sprawdza baterię, deszcz, czas schnięcia, prognozę, temperaturę i rosę.",
+        "Opcjonalnie: tylko wybrane dni, okno godzin, tylko za dnia (ochrona jeży), przerwa, gdy ktoś jest w ogrodzie.",
+        "Jedno powiadomienie na zdarzenie: błąd, długa pauza, brak łączności, zbyt długie koszenie."
+      ],
+      "wymagania": [
+        "Home Assistant 2024.10 lub nowszy",
+        "Encja lawn_mower kosiarki",
+        "Pomocnik Data i godzina (najwcześniejsze następne koszenie)",
+        "Wyłączony harmonogram w aplikacji producenta"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/koszenie.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/docs/koszenie.md",
+      "zrzut": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/koszenie.png",
+      "repozytorium": "https://github.com/SmartServicePL/automatyzacje-smart-service",
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Fkoszenie.yaml",
+      "licencja": "MIT",
+      "linki_dodatkowe": []
+    },
+    {
+      "id": "koszenie-worx",
+      "kategoria": "ogrod",
+      "nazwa": "Worx Vision / RTK – inteligentny harmonogram koszenia",
+      "wersja": "0.8.0",
+      "min_ha": "2025.1.0",
+      "krotki_opis": "Liczy przyrost trawy i wybiera najlepszą godzinę z prognozy. Najpierw krawędzie, potem ładowanie, potem koszenie.",
+      "opis": [
+        "Model przyrostu trawy z prognozy godzinowej (temperatura, UV, opad).",
+        "Wybór suchej godziny z prognozy, omijanie rosy i upału.",
+        "Cykl: przycinanie krawędzi → ładowanie do 80% → koszenie całego trawnika.",
+        "Opcjonalnie: tylko wybrane dni, tylko za dnia, przerwa, gdy ktoś jest w ogrodzie, powiadomienia na telefon."
+      ],
+      "wymagania": [
+        "Home Assistant 2025.1 lub nowszy",
+        "Kosiarka Worx Vision / Vision Cloud",
+        "Integracja Worx Vision Cloud PLUS 1.3.1 lub nowsza",
+        "Trzy pomocniki: przyrost trawy, ostatnie koszenie, następne koszenie"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/worx_vision_cloud_plus_automation/blob/main/blueprints/automation/worx_vision_cloud_plus/smart_mowing_schedule.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/worx_vision_cloud_plus_automation/blob/main/docs/smart-mowing-schedule.md",
+      "zrzut": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/koszenie-worx.png",
+      "repozytorium": "https://github.com/SmartServicePL/worx_vision_cloud_plus_automation",
+      "linki_dodatkowe": [
+        {
+          "nazwa": "Integracja Worx Vision Cloud PLUS",
+          "url": "https://github.com/SmartServicePL/worx_vision_cloud_plus_github"
+        }
+      ],
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fworx_vision_cloud_plus_automation%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fworx_vision_cloud_plus%2Fsmart_mowing_schedule.yaml",
+      "licencja": "MIT"
+    },
+    {
+      "id": "podlewanie",
+      "kategoria": "ogrod",
+      "nazwa": "Inteligentne podlewanie ogrodu – 1 do 12 sekcji",
+      "wersja": "1.5.0",
+      "min_ha": "2025.1.0",
+      "krotki_opis": "Podlewa każdą sekcję wtedy, gdy gleba tego potrzebuje, z bilansem wody, prognozą i zmierzonym deszczem.",
+      "opis": [
+        "Od 1 do 12 sekcji, dla każdej osobno gleba, rośliny i typ zraszaczy.",
+        "Trwały bilans wody każdej sekcji (ETo, deszcz, podlewanie).",
+        "Rain Bird RC2 oraz zawory i przekaźniki Sonoff, Shelly, ESPHome."
+      ],
+      "wymagania": [
+        "Home Assistant 2025.1 lub nowszy",
+        "Encja weather z prognozą",
+        "Zawory lub sekcje sterownika w Home Assistant",
+        "Pomocnik Tekst (trwały bilans wody)"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/smart_irrigation_automation/blob/main/blueprints/automation/smart_irrigation_automation/smart_irrigation.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/smart_irrigation_automation/blob/main/docs/smart-irrigation.md",
+      "zrzut": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/podlewanie.png",
+      "repozytorium": "https://github.com/SmartServicePL/smart_irrigation_automation",
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fsmart_irrigation_automation%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_irrigation_automation%2Fsmart_irrigation.yaml",
+      "licencja": "MIT",
+      "linki_dodatkowe": []
+    },
+    {
+      "id": "robot-sprzatajacy-uniwersalny",
+      "kategoria": "dom",
+      "nazwa": "Robot sprzątający pod nieobecność – każda marka",
+      "wersja": "1.0.0",
+      "min_ha": "2024.10.0",
+      "krotki_opis": "Robot sprząta, gdy nikogo nie ma w domu, i wraca do stacji, gdy ktoś wróci.",
+      "opis": [
+        "Działa z każdym robotem z encją vacuum (Roborock, Ecovacs, Dreame, Xiaomi, Matter i inne).",
+        "Cały dom, wybrane obszary (vacuum.clean_area) albo własne akcje startu producenta.",
+        "Opcjonalnie: licznik potrzeby (np. brud, kuweta), tylko wybrane dni, okno godzin, blokady.",
+        "Limit czasu i jedno powiadomienie na zdarzenie: błąd, długa pauza, brak łączności."
+      ],
+      "wymagania": [
+        "Home Assistant 2024.10 lub nowszy (2026.3 dla sprzątania obszarów)",
+        "Encja vacuum robota",
+        "Pomocnik Data i godzina (najwcześniejsze następne sprzątanie)",
+        "Domownicy: osoby, urządzenia albo czujniki obecności"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/roboty_sprzatajace.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/docs/roboty-sprzatajace.md",
+      "zrzut": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/roboty-sprzatajace.png",
+      "repozytorium": "https://github.com/SmartServicePL/automatyzacje-smart-service",
+      "linki_dodatkowe": [
+        {
+          "nazwa": "Dreame Scheduler (botts7, MIT) – dla robotów Dreame",
+          "url": "https://github.com/botts7/dreame-scheduler"
+        }
+      ],
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Froboty_sprzatajace.yaml",
+      "licencja": "MIT"
+    },
+    {
+      "id": "x20-konserwacja",
+      "kategoria": "dom",
+      "nazwa": "Xiaomi X20 Max – powiadomienia o konserwacji",
+      "wersja": "1.0.1",
+      "min_ha": "2026.7.0",
+      "krotki_opis": "Powiadomienie, gdy stacja zgłosi problem, robot zniknie z sieci albo trzeba uzupełnić detergent lub wymienić część.",
+      "opis": [
+        "Trwały problem stacji, niedostępność robota.",
+        "Niski poziom detergentu i zużycie mopów, filtra, szczotek i worka.",
+        "Jedna automatyzacja na robota."
+      ],
+      "wymagania": [
+        "Home Assistant 2026.7 lub nowszy",
+        "Xiaomi Robot Vacuum X20 Max",
+        "Integracja Xiaomi X20 Max"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/xiaomi-x20-max/blob/main/blueprints/automation/SmartServicePL/x20_max_maintenance.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/xiaomi-x20-max/blob/main/README_PL.md",
+      "zrzut": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/x20-konserwacja.png",
+      "repozytorium": "https://github.com/SmartServicePL/xiaomi-x20-max",
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fxiaomi-x20-max%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FSmartServicePL%2Fx20_max_maintenance.yaml",
+      "licencja": "MIT",
+      "linki_dodatkowe": []
+    }
+  ]
+}
