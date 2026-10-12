@@ -1,6 +1,6 @@
 # Robot sprzątający pod nieobecność – każda marka
 
-Blueprint Home Assistant, który uruchamia robota odkurzającego lub mopującego, gdy nikogo nie ma w domu, i pilnuje go w trakcie pracy. Działa z każdą integracją, która udostępnia encję `vacuum`, np. Roborock, Ecovacs, Dreame, Xiaomi, urządzenia Matter.
+Blueprint Home Assistant, który uruchamia robota odkurzającego lub mopującego, gdy nikogo nie ma w domu, i pilnuje go w trakcie pracy. Działa z każdą integracją, która udostępnia encję `vacuum`, np. Roborock, Ecovacs, Dreame, urządzenia Matter.
 
 [![Importuj do Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Froboty_sprzatajace.yaml)
 

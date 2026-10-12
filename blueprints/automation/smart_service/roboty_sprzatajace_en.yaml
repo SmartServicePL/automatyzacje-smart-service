@@ -2,7 +2,7 @@ blueprint:
   name: Smart Service - robot cleaning while nobody is home
   description: |
     Universal cleaning with a robot vacuum or mopping robot from Home Assistant
-    (any integration with a vacuum entity, e.g. Roborock, Ecovacs, Dreame, Xiaomi, Matter).
+    (any integration with a vacuum entity, e.g. Roborock, Ecovacs, Dreame, Matter).
     One automation = one robot. For several floors or robots, create several
     automations from this blueprint (each with its own helper).
 

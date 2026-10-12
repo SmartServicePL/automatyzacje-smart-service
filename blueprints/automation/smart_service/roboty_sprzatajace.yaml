@@ -2,7 +2,7 @@ blueprint:
   name: Smart Service - robot sprzątający pod nieobecność
   description: |
     Uniwersalne sprzątanie robotem odkurzającym lub mopującym z Home Assistant
-    (dowolna integracja z encją vacuum, np. Roborock, Ecovacs, Dreame, Xiaomi, Matter).
+    (dowolna integracja z encją vacuum, np. Roborock, Ecovacs, Dreame, Matter).
     Jedna automatyzacja = jeden robot. Dla kilku pięter lub robotów utwórz kilka
     automatyzacji z tego blueprintu (każda z własnym pomocnikiem).
 

@@ -107,7 +107,7 @@
       "min_ha": "2024.10.0",
       "krotki_opis": "Robot sprząta, gdy nikogo nie ma w domu, i wraca do stacji, gdy ktoś wróci.",
       "opis": [
-        "Działa z każdym robotem z encją vacuum (Roborock, Ecovacs, Dreame, Xiaomi, Matter i inne).",
+        "Działa z każdym robotem z encją vacuum (Roborock, Ecovacs, Dreame, Matter i inne).",
         "Cały dom, wybrane obszary (vacuum.clean_area) albo własne akcje startu producenta.",
         "Opcjonalnie: licznik potrzeby (np. brud, kuweta), tylko wybrane dni, okno godzin, blokady.",
         "Limit czasu i jedno powiadomienie na zdarzenie: błąd, długa pauza, brak łączności."

@@ -2,7 +2,7 @@ blueprint:
   name: Smart Service - Reinigungsroboter bei Abwesenheit
   description: |
     Universelle Reinigung mit einem Saug- oder Wischroboter aus Home Assistant
-    (jede Integration mit einer vacuum-Entität, z. B. Roborock, Ecovacs, Dreame, Xiaomi, Matter).
+    (jede Integration mit einer vacuum-Entität, z. B. Roborock, Ecovacs, Dreame, Matter).
     Eine Automatisierung = ein Roboter. Für mehrere Etagen oder Roboter erstellen Sie mehrere
     Automatisierungen aus diesem Blueprint (jede mit eigenem Helfer).
 
