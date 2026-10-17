@@ -169,7 +169,7 @@
       "opis": [
         "Działa z centralą Smart Service Alarm i z każdą inną centralą alarm_control_panel.",
         "Drzwi i okna przy każdym uzbrojeniu, ruch tylko poza domem; dym, czad, gaz i zalanie zawsze, bez zmiany stanu centrali.",
-        "Powiadomienie krytyczne co 2 minuty (najwyżej 5 razy) do PRZYJĄŁEM, potem „Potwierdził: imię” u wszystkich; syreny na ustawiony czas albo cichy alarm.",
+        "Powiadomienie krytyczne co 2 minuty (najwyżej 5 razy) do PRZYJĄŁEM, potem „Potwierdzenie: imię” u wszystkich; syreny na ustawiony czas albo cichy alarm.",
         "Opcjonalnie: uzbrajanie na noc według ciszy nocnej, przypomnienie, gdy wszyscy wyszli, pilnowanie łączności i baterii czujników."
       ],
       "wymagania": [

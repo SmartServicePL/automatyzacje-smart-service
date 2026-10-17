@@ -30,7 +30,7 @@ Gdy centrala przejdzie w stan „alarm” albo czujnik wykryje zagrożenie, wybr
 
 Powiadomienie ma przycisk **PRZYJĄŁEM** i wraca co 2 minuty, najwyżej 5 razy. Pierwsze naciśnięcie PRZYJĄŁEM na dowolnym telefonie:
 - gasi powiadomienie na wszystkich telefonach,
-- wysyła wszystkim „Potwierdził: imię” (osoba przypisana do konta Home Assistant, z którego przyszło naciśnięcie),
+- wysyła wszystkim „Potwierdzenie: imię” (osoba przypisana do konta Home Assistant, z którego przyszło naciśnięcie),
 - przy zagrożeniu wyłącza syreny.
 
 Włamanie przestaje się powtarzać także po rozbrojeniu albo po końcu alarmu w centrali.
@@ -49,17 +49,23 @@ Włamanie przestaje się powtarzać także po rozbrojeniu albo po końcu alarmu 
 **Uzbrajaj na noc według ciszy nocnej.** Wymaga przełącznika ciszy nocnej (`input_boolean`, harmonogram ustawia panel albo Ty).
 - Początek ciszy nocnej: uzbrojenie na noc bez kodu, tylko gdy alarm jest rozbrojony. Uzbrojonego alarmu („poza domem”, „w domu”) ani trwającego alarmu automatyzacja nie rusza.
 - Koniec ciszy nocnej: rozbrojenie bez kodu, tylko gdy to uzbrojenie na noc zrobiła automatyzacja i od tego czasu nie było alarmu. Uzbrojenia ręcznego nie rusza.
+- Był alarm w nocy: rano bez rozbrojenia, powiadomienie „Alarm nadal uzbrojony na noc” z treścią „Nie rozbrajam: w nocy był alarm”.
 - Odmowa centrali (np. otwarte okno z listy czujników sprawdzanych przy uzbrojeniu) = powiadomienie „Nie uzbroiłem alarmu na noc” z powodem, np. „Zamknij: Okno salon”.
 - Centrala wymagająca kodu do uzbrojenia: automatyzacja jej nie uzbraja i podaje powód. Kodu nie zapisuje się w automatyzacji.
 
 Z centralą Smart Service Alarm rozbrojenie po nocy działa dzięki jej zasadzie: automatyzacja może rozbroić bez PIN-u tylko uzbrojenie na noc zrobione przez automatyzację, bez alarmu od tego czasu. Dodaj czujniki drzwi i okien do „Czujników sprawdzanych przy uzbrojeniu” w ustawieniach centrali, żeby otwarte okno blokowało uzbrojenie.
 
-Inna centrala: uzbrajanie na noc działa tylko z centralą bez kodu (`code_format` puste), bo inaczej rano nie dałoby się jej rozbroić. Rozbrojenie po nocy następuje, gdy centrala przeszła w „uzbrojony na noc” najpóźniej 15 minut po początku ciszy nocnej i nie zrobił tego użytkownik z aplikacji.
+**Inna centrala** (nie Smart Service Alarm) nie mówi, kto ją uzbroił ani czy w nocy był alarm, więc automatyzacja pamięta noc sama:
+- uzbrajanie na noc działa tylko z centralą bez kodu (`code_format` puste), bo inaczej rano nie dałoby się jej rozbroić;
+- od uzbrojenia na początku ciszy nocnej automatyzacja pilnuje centrali do rana. Rano rozbraja ją tylko wtedy, gdy przez całą noc była w stanie „uzbrajanie” albo „uzbrojony na noc”;
+- przejście w „oczekiwanie” (`pending`) albo „alarm” (`triggered`) w nocy, także krótkie, z powrotem do „uzbrojony na noc”: rano bez rozbrojenia i powiadomienie „Nie rozbrajam: w nocy był alarm”;
+- rozbrojenie albo inne uzbrojenie w nocy przez użytkownika kończy pilnowanie: rano automatyzacja niczego nie zmienia;
+- restart Home Assistant w nocy: pamięć nocy przepada, więc rano bez rozbrojenia i powiadomienie „Nie rozbrajam: w nocy był restart Home Assistant”.
 
 ## Wyjście z domu (opcjonalnie)
 
 **Przypomnij, gdy wszyscy wyszli.** Gdy wszyscy wybrani domownicy (`person`) są poza domem od 2 minut, a alarm jest rozbrojony, przychodzi powiadomienie „Wszyscy wyszli, alarm nieuzbrojony”. Domownik ze stanem nieznanym krócej niż dobę liczy się jako obecny.
-- Centrala bez kodu do uzbrojenia: przycisk **Uzbrój** uzbraja „poza domem” i wysyła wszystkim „Uzbroił: imię”. Odmowa centrali przychodzi jako powiadomienie z powodem.
+- Centrala bez kodu do uzbrojenia: przycisk **Uzbrój** uzbraja „poza domem” i wysyła wszystkim „Uzbrojenie: imię”. Odmowa centrali przychodzi jako powiadomienie z powodem.
 - Centrala z kodem do uzbrojenia: przycisk **Otwórz alarm** otwiera okno alarmu w aplikacji (Android; iOS otwiera aplikację).
 
 Z powiadomienia nie da się rozbroić alarmu.
@@ -68,7 +74,7 @@ Z powiadomienia nie da się rozbroić alarmu.
 
 Dla wszystkich czujników z trzech list:
 - brak łączności (stan „niedostępny”) dłużej niż 30 minut: powiadomienie „Czujnik alarmu nie działa”; w ciszy nocnej czeka do jej końca;
-- codziennie o 9:00 przegląd: czujniki bez łączności od ponad doby i baterie poniżej 15% (czujnik baterii tego samego urządzenia, `device_class: battery`, także czujnik „słaba bateria”). Jedno powiadomienie na dzień, dopóki problem trwa.
+- codziennie o 9:00 przegląd: czujniki bez łączności od ponad doby i baterie poniżej 15% (czujnik baterii tego samego urządzenia, `device_class: battery`, także czujnik „słaba bateria”). Jedno powiadomienie na dzień, dopóki problem trwa. Gdy o 9:00 trwa cisza nocna, tego dnia przegląd nic nie wysyła.
 
 ## Powód decyzji (opcjonalnie)
 
@@ -76,8 +82,8 @@ Pomocnik **Tekst** (maks. 255 znaków) dostaje ostatnią decyzję, np.:
 - „Uzbroiłem na noc o 22:00”,
 - „Nie uzbroiłem na noc: Zamknij: Okno salon”,
 - „Wyzwoliłem alarm: Drzwi wejściowe o 23:14”,
-- „Potwierdził: Anna o 23:15”,
-- „Nie rozbrajam po nocy: uzbrojenie nie pochodzi od tej automatyzacji albo był alarm”.
+- „Potwierdzenie: Anna o 23:15”,
+- „Nie rozbrajam po nocy: w nocy był alarm”.
 
 ## Teksty powiadomień
 
@@ -94,9 +100,10 @@ Opcjonalnie: syreny (`siren`), przełącznik ciszy nocnej (`input_boolean`), dom
 
 ## Ograniczenia
 
-- Gdy Home Assistant nie działa, nikt nie wyzwala centrali ani nie wysyła powiadomień. Restart przerywa powtarzanie powiadomienia i czekanie na koniec ciszy nocnej.
+- Gdy Home Assistant nie działa, nikt nie wyzwala centrali ani nie wysyła powiadomień. Restart przerywa powtarzanie powiadomienia i czekanie na koniec ciszy nocnej z powiadomieniem o czujniku.
+- Inna centrala: zapisanie zmian w tej automatyzacji w nocy też kasuje pamięć nocy. Rano centrala zostaje wtedy uzbrojona na noc, bez powiadomienia.
 - Czujnik, który był niedostępny już przed restartem, pojawi się w przeglądzie dopiero po dobie od restartu (licznik czasu zaczyna się od nowa).
-- „Potwierdził” pokazuje imię osoby przypisanej do konta Home Assistant z aplikacji. Konto bez osoby = „ktoś z domowników”.
+- „Potwierdzenie” pokazuje imię osoby przypisanej do konta Home Assistant z aplikacji. Konto bez osoby = „ktoś z domowników”.
 - Uzbrojenie na noc innej automatyzacji centrala Smart Service Alarm traktuje tak samo jak uzbrojenie z tego blueprintu.
 
 ## Licencja

@@ -287,16 +287,18 @@ variables:
     co_zrobic_moisture: "What to do: shut off the main water valve and check the place near the sensor."
     co_zrobic_inne: "What to do: check the place near the sensor."
     przyjete_tytul: "Alarm acknowledged"
-    przyjete_tresc: "Acknowledged by: {imie} at {godzina}.\nWhat to do: nothing, someone is already on it."
+    przyjete_tresc: "Acknowledgement: {imie} at {godzina}.\nWhat to do: nothing, someone is already on it."
     noc_odmowa_tytul: "Alarm not armed for the night"
     noc_odmowa_tresc: "{powod}.\nWhat to do: fix it and arm the alarm manually."
     rano_odmowa_tytul: "Alarm still armed for the night"
     rano_odmowa_tresc: "The panel did not accept disarming after the night.\nWhat to do: disarm the alarm with a code before opening the door."
+    rano_alarm_tresc: "Not disarming: there was an alarm during the night.\nWhat to do: check what triggered it and disarm the alarm manually."
+    rano_restart_tresc: "Not disarming: Home Assistant restarted during the night.\nWhat to do: disarm the alarm manually before opening the door."
     wyszli_tytul: "Everyone has left, alarm not armed"
     wyszli_tresc: "Nobody is home and the alarm is disarmed.\nWhat to do: arm the alarm with the button below."
     wyszli_kod_tresc: "Nobody is home and the alarm is disarmed.\nWhat to do: open the alarm and arm it with a code."
     uzbrojony_tytul: "Alarm armed"
-    uzbrojony_tresc: "Armed by: {imie} from the notification at {godzina}.\nWhat to do: nothing, the alarm is guarding the home."
+    uzbrojony_tresc: "Arming: {imie}, from the notification at {godzina}.\nWhat to do: nothing, the alarm is guarding the home."
     uzbroj_odmowa_tytul: "Alarm not armed"
     uzbroj_odmowa_tresc: "{powod}.\nWhat to do: fix it and arm the alarm again."
     czujniki_tytul: "Alarm sensor not working"
@@ -312,15 +314,17 @@ variables:
     p_wyzwolenie: "Triggered the alarm: {czujnik} at {godzina}"
     p_alarm: "Alarm: {czujnik} at {godzina}"
     p_zagrozenie: "Hazard: {czujnik} at {godzina}"
-    p_przyjete: "Acknowledged by: {imie} at {godzina}"
+    p_przyjete: "Acknowledgement: {imie} at {godzina}"
     p_noc_uzbrojony: "Armed for the night at {godzina}"
     p_noc_juz_uzbrojony: "Not arming for the night: the alarm is already armed"
     p_noc_odmowa: "Not armed for the night: {powod}"
     p_rano_rozbrojony: "Disarmed after the night at {godzina}"
-    p_rano_nie_ruszam: "Not disarming after the night: the arming was not made by this automation or there was an alarm"
+    p_rano_nie_ruszam: "Not disarming after the night: the arming was not made by this automation"
+    p_rano_alarm: "Not disarming after the night: there was an alarm during the night"
+    p_rano_restart: "Not disarming after the night: Home Assistant restarted during the night"
     p_rano_odmowa: "Not disarmed after the night: the panel refused"
     p_wyszli: "Reminder: everyone left at {godzina}, alarm disarmed"
-    p_uzbrojony: "Armed from the notification ({imie}) at {godzina}"
+    p_uzbrojony: "Arming from the notification: {imie} at {godzina}"
     p_uzbroj_odmowa: "Not armed from the notification: {powod}"
   alarm: !input alarm
   czujniki_obwod: !input czujniki_obwod
@@ -818,43 +822,45 @@ actions:
             data:
               value: "{{ nowy_powod[:255] }}"
 
-  - alias: End of quiet night - disarming after the night
+  - alias: Other alarm panel - remember the night until morning
     if:
       - condition: template
-        value_template: "{{ trigger.id == 'noc_koniec' and uzbrajaj_na_noc and stan == 'armed_night' }}"
+        value_template: >-
+          {{ uzbrajaj_na_noc and not smart_service and cisza_nocna != ''
+             and states(alarm) in ['arming', 'armed_night']
+             and ((trigger.id == 'noc_start' and stan == 'disarmed')
+                  or (trigger.id == 'start' and is_state(cisza_nocna, 'on'))) }}
     then:
       - variables:
-          moje_uzbrojenie: >-
-            {%- set s = states[alarm] -%}
-            {%- if smart_service -%}
-              {{ state_attr(alarm, 'uzbrojenie_przez_automat') is true
-                 and state_attr(alarm, 'zmiana_przez') == 'automatyzacja' }}
-            {%- else -%}
-              {%- set od = trigger.from_state.last_changed if trigger.from_state is not none else now() -%}
-              {{ bez_kodu | bool and s.context.user_id is none
-                 and s.last_changed >= od and (s.last_changed - od).total_seconds() <= 900 }}
-            {%- endif -%}
+          po_restarcie: "{{ trigger.id == 'start' }}"
+          nowy_powod: ""
+      - alias: Wait for the end of quiet night or a change of the panel state
+        wait_template: "{{ is_state(cisza_nocna, 'off') or states(alarm) not in ['arming', 'armed_night'] }}"
+        timeout:
+          hours: 20
+        continue_on_timeout: false
+      - variables:
+          noc_alarm: "{{ states(alarm) in ['pending', 'triggered'] }}"
       - if:
           - condition: template
-            value_template: "{{ moje_uzbrojenie | bool }}"
+            value_template: "{{ noc_alarm }}"
         then:
-          - action: alarm_control_panel.alarm_disarm
-            continue_on_error: true
-            target:
-              entity_id: !input alarm
-          - wait_template: "{{ is_state(alarm, 'disarmed') }}"
+          - alias: There was an alarm during the night - wait until morning
+            wait_template: "{{ is_state(cisza_nocna, 'off') }}"
             timeout:
-              seconds: "{{ 2 if smart_service else 30 }}"
-            continue_on_timeout: true
-          - if:
+              hours: 20
+            continue_on_timeout: false
+      - choose:
+          - alias: Alarm or restart during the night - not disarming
+            conditions:
               - condition: template
-                value_template: "{{ is_state(alarm, 'disarmed') }}"
-            then:
+                value_template: >-
+                  {{ (noc_alarm and not is_state(alarm, 'disarmed'))
+                     or (po_restarcie and is_state(alarm, 'armed_night')) }}
+            sequence:
               - variables:
-                  nowy_powod: "{{ teksty.p_rano_rozbrojony | replace('{godzina}', godzina) }}"
-            else:
-              - variables:
-                  nowy_powod: "{{ teksty.p_rano_odmowa }}"
+                  tresc: "{{ teksty.rano_alarm_tresc if noc_alarm else teksty.rano_restart_tresc }}"
+                  nowy_powod: "{{ teksty.p_rano_alarm if noc_alarm else teksty.p_rano_restart }}"
               - repeat:
                   for_each: "{{ uslugi }}"
                   sequence:
@@ -862,15 +868,117 @@ actions:
                       continue_on_error: true
                       data:
                         title: "{{ teksty.rano_odmowa_tytul }}"
-                        message: "{{ teksty.rano_odmowa_tresc }}"
+                        message: "{{ tresc }}"
                         data:
                           tag: "{{ tag_noc }}"
-        else:
+          - alias: Night without an alarm - disarming
+            conditions:
+              - condition: template
+                value_template: "{{ not po_restarcie and is_state(cisza_nocna, 'off') and is_state(alarm, 'armed_night') }}"
+            sequence:
+              - action: alarm_control_panel.alarm_disarm
+                continue_on_error: true
+                target:
+                  entity_id: !input alarm
+              - wait_template: "{{ is_state(alarm, 'disarmed') }}"
+                timeout:
+                  seconds: 30
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: "{{ is_state(alarm, 'disarmed') }}"
+                then:
+                  - variables:
+                      nowy_powod: "{{ teksty.p_rano_rozbrojony | replace('{godzina}', godzina) }}"
+                else:
+                  - variables:
+                      nowy_powod: "{{ teksty.p_rano_odmowa }}"
+                  - repeat:
+                      for_each: "{{ uslugi }}"
+                      sequence:
+                        - action: "{{ repeat.item }}"
+                          continue_on_error: true
+                          data:
+                            title: "{{ teksty.rano_odmowa_tytul }}"
+                            message: "{{ teksty.rano_odmowa_tresc }}"
+                            data:
+                              tag: "{{ tag_noc }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' and nowy_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+
+  - alias: End of quiet night - disarming after the night (Smart Service Alarm)
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'noc_koniec' and uzbrajaj_na_noc and smart_service and stan == 'armed_night' }}"
+    then:
+      - choose:
+          - alias: Armed by an automation, no alarm - disarming
+            conditions:
+              - condition: template
+                value_template: >-
+                  {{ state_attr(alarm, 'uzbrojenie_przez_automat') is true
+                     and state_attr(alarm, 'zmiana_przez') == 'automatyzacja' }}
+            sequence:
+              - action: alarm_control_panel.alarm_disarm
+                continue_on_error: true
+                target:
+                  entity_id: !input alarm
+              - wait_template: "{{ is_state(alarm, 'disarmed') }}"
+                timeout:
+                  seconds: 2
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: "{{ is_state(alarm, 'disarmed') }}"
+                then:
+                  - variables:
+                      nowy_powod: "{{ teksty.p_rano_rozbrojony | replace('{godzina}', godzina) }}"
+                else:
+                  - variables:
+                      nowy_powod: "{{ teksty.p_rano_odmowa }}"
+                  - repeat:
+                      for_each: "{{ uslugi }}"
+                      sequence:
+                        - action: "{{ repeat.item }}"
+                          continue_on_error: true
+                          data:
+                            title: "{{ teksty.rano_odmowa_tytul }}"
+                            message: "{{ teksty.rano_odmowa_tresc }}"
+                            data:
+                              tag: "{{ tag_noc }}"
+          - alias: Armed by an automation, but there was an alarm during the night - not disarming
+            conditions:
+              - condition: template
+                value_template: >-
+                  {{ state_attr(alarm, 'uzbrojenie_przez_automat') is true
+                     and state_attr(alarm, 'zmiana_przez') == 'wyzwolenie' }}
+            sequence:
+              - variables:
+                  nowy_powod: "{{ teksty.p_rano_alarm }}"
+              - repeat:
+                  for_each: "{{ uslugi }}"
+                  sequence:
+                    - action: "{{ repeat.item }}"
+                      continue_on_error: true
+                      data:
+                        title: "{{ teksty.rano_odmowa_tytul }}"
+                        message: "{{ teksty.rano_alarm_tresc }}"
+                        data:
+                          tag: "{{ tag_noc }}"
+        default:
           - variables:
               nowy_powod: "{{ teksty.p_rano_nie_ruszam }}"
       - if:
           - condition: template
-            value_template: "{{ pomocnik_powod != '' }}"
+            value_template: "{{ pomocnik_powod != '' and nowy_powod != '' }}"
         then:
           - action: input_text.set_value
             continue_on_error: true
@@ -1013,13 +1121,10 @@ actions:
   - alias: Daily sensor check - connection and batteries
     if:
       - condition: template
-        value_template: "{{ trigger.id == 'przeglad' and wszystkie_czujniki | count > 0 }}"
+        value_template: >-
+          {{ trigger.id == 'przeglad' and wszystkie_czujniki | count > 0
+             and not (cisza_nocna != '' and is_state(cisza_nocna, 'on')) }}
     then:
-      - alias: During quiet night wait until it ends
-        wait_template: "{{ cisza_nocna == '' or not is_state(cisza_nocna, 'on') }}"
-        timeout:
-          hours: 14
-        continue_on_timeout: false
       - variables:
           problemy: >-
             {%- set ns = namespace(l=[], b=[]) -%}

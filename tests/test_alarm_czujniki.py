@@ -99,14 +99,59 @@ class AlarmBlueprintTests(unittest.TestCase):
         self.assertEqual(variables["odstep_powtorzen_s"], 120)
         self.assertEqual(self.bp["blueprint"]["homeassistant"]["min_version"], "2026.7.0")
 
+    def _step(self, alias: str) -> dict:
+        return next(step for step in self.bp["actions"] if step["alias"].startswith(alias))
+
     def test_disarm_only_after_quiet_night(self) -> None:
-        """No notification action can disarm: alarm_disarm sits only in the end-of-night step."""
+        """No notification action can disarm: alarm_disarm sits only in the two end-of-night steps."""
         owners = []
         for step in self.bp["actions"]:
             if any(isinstance(n, dict) and n.get("action") == "alarm_control_panel.alarm_disarm" for n in walk(step)):
                 owners.append(json.dumps(step["if"], ensure_ascii=False))
-        self.assertEqual(len(owners), 1)
-        self.assertIn("noc_koniec", owners[0])
+        self.assertEqual(len(owners), 2)
+        self.assertIn("noc_koniec", owners[1])
+        self.assertIn("smart_service", owners[1])
+        self.assertIn("not smart_service", owners[0])
+        for condition in owners:
+            self.assertNotIn("uzbroj", condition)
+            self.assertNotIn("przyjalem", condition)
+
+    def test_other_panel_remembers_the_night(self) -> None:
+        """Other panels: pending or triggered during the night, or a restart, means no disarm in the morning."""
+        step = self._step("Obca centrala")
+        text = json.dumps(step, ensure_ascii=False)
+        self.assertIn("noc_start", text)
+        self.assertIn("trigger.id == 'start'", text)
+        then = step["then"]
+        wait = next(s for s in then if "wait_template" in s)
+        self.assertIn("is_state(cisza_nocna, 'off')", wait["wait_template"])
+        self.assertIn("not in ['arming', 'armed_night']", wait["wait_template"])
+        self.assertFalse(wait["continue_on_timeout"])
+        flag = next(s for s in then if "variables" in s and "noc_alarm" in s["variables"])
+        self.assertIn("['pending', 'triggered']", flag["variables"]["noc_alarm"])
+        choose = next(s for s in then if "choose" in s)["choose"]
+        refuse, disarm = choose
+        self.assertIn("noc_alarm", refuse["conditions"][0]["value_template"])
+        self.assertIn("po_restarcie", refuse["conditions"][0]["value_template"])
+        self.assertFalse(any(isinstance(n, dict) and n.get("action", "").endswith("alarm_disarm") for n in walk(refuse)))
+        guard = disarm["conditions"][0]["value_template"]
+        self.assertIn("not po_restarcie", guard)
+        self.assertIn("is_state(alarm, 'armed_night')", guard)
+        # The old rule (armed_night at most 15 minutes after the start of quiet night) is gone.
+        self.assertNotIn("900", text)
+
+    def test_daily_check_skipped_in_quiet_night(self) -> None:
+        condition = self._step("Codzienny przegląd")["if"][0]["value_template"]
+        self.assertIn("is_state(cisza_nocna, 'on')", condition)
+        self.assertFalse(any(isinstance(n, dict) and "wait_template" in n for n in walk(self._step("Codzienny przegląd"))))
+
+    def test_impersonal_texts(self) -> None:
+        texts = self.bp["variables"]["teksty"]
+        self.assertTrue(texts["przyjete_tresc"].startswith("Potwierdzenie: {imie}"))
+        self.assertTrue(texts["uzbrojony_tresc"].startswith("Uzbrojenie: {imie}"))
+        joined = " ".join(texts.values())
+        self.assertNotIn("Potwierdził", joined)
+        self.assertNotIn("Uzbroił:", joined)
 
     def test_notification_texts_end_with_what_to_do(self) -> None:
         for suffix, prefix in WHAT_TO_DO.items():
