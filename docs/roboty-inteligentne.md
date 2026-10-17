@@ -19,7 +19,7 @@ Licznik rośnie, a pełne sprzątanie go zeruje. Domyślnie:
 | otwarcie wybranych drzwi zewnętrznych | 2, a po deszczu 4 |
 | użycie kuwety (licznik użyć) | 1 |
 
-Deszcz („mokro”) to co najmniej 1 mm w ciągu 24 h, prognoza co najmniej 0,5 mm albo 60% szansy deszczu w 3 h, albo deszcz teraz według encji pogody. Wszystkie te czujniki są opcjonalne. Zamiast licznika brudu można podać własny licznik potrzeby.
+Deszcz („mokro”) to co najmniej 1 mm opadu w ciągu 24 h (sensor opadu), a bez tego sensora deszcz teraz według encji pogody. Oba są opcjonalne. Zamiast licznika brudu można podać własny licznik potrzeby.
 
 ## Kiedy robot startuje
 
@@ -79,7 +79,7 @@ Wynik sprzątania zostaje widoczny przez godzinę, potem wraca „Czekam: …”
 
 Opcjonalnie:
 - sensory baterii, błędu, alarmów stacji, posprzątanej powierzchni i czasu sprzątania (z integracji robota);
-- drzwi zewnętrzne, czujniki opadu albo pogoda, licznik użyć kuwety;
+- drzwi zewnętrzne, sensor opadu z 24 h albo encja pogody, licznik użyć kuwety;
 - cisza nocna i blokady.
 
 ## Co sprzątać
@@ -95,7 +95,7 @@ Opcjonalnie:
 W polu **Akcje powiadomienia** dodaj dowolną akcję, np. `notify.mobile_app_twoj_telefon`. Dostępne zmienne:
 - `{{ tytul }}` i `{{ tresc }}`: tytuł i treść powiadomienia;
 - `{{ tag }}`: ten sam dla jednego problemu, więc kolejne powiadomienie zastępuje poprzednie;
-- `{{ rodzaj }}`: `problem`, `przypomnienie`, `rozwiazany` albo `informacja`.
+- `{{ typ }}`: `problem`, `przypomnienie`, `rozwiazany` albo `informacja`.
 
 Problem (brak łączności, błąd, problem stacji, długa pauza, robot utknął) wysyła powiadomienie od razu. Dopóki trwa, przypomnienie przychodzi co 6 h, a w ciszy nocnej czeka do rana. Gdy problem minie, przychodzi informacja „problem usunięty”.
 

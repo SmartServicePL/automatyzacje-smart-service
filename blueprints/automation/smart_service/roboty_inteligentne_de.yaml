@@ -221,25 +221,9 @@ blueprint:
             entity:
               filter:
                 - domain: sensor
-        prognoza_opad_3h:
-          name: Niederschlagsprognose für 3 Stunden (optional)
-          description: Niederschlagssensor in mm. Mindestens 0,5 mm = nass.
-          default: ""
-          selector:
-            entity:
-              filter:
-                - domain: sensor
-        prognoza_szansa_deszczu_3h:
-          name: Regenwahrscheinlichkeit in 3 Stunden (optional)
-          description: Sensor in Prozent. Mindestens 60% = nass.
-          default: ""
-          selector:
-            entity:
-              filter:
-                - domain: sensor
-        pogoda:
+        prognoza:
           name: Wetter (optional)
-          description: Wetter-Entität, die ohne Niederschlagssensoren verwendet wird. Regen jetzt = nass.
+          description: Wetter-Entität, die ohne Niederschlagssensor für 24 Stunden verwendet wird. Regen jetzt = nass.
           default: ""
           selector:
             entity:
@@ -570,7 +554,7 @@ blueprint:
           description: >-
             Aktionen, die bei jeder Benachrichtigung ausgeführt werden, z. B. notify.mobile_app_telefon.
             Variablen: {{ tytul }}, {{ tresc }}, {{ tag }} (gleich für ein Problem)
-            und {{ rodzaj }} (problem, przypomnienie, rozwiazany, informacja). Leer = keine Benachrichtigungen.
+            und {{ typ }} (problem, przypomnienie, rozwiazany, informacja). Leer = keine Benachrichtigungen.
           default: []
           selector:
             action: {}
@@ -623,9 +607,7 @@ variables:
   pkt_drzwi: !input pkt_drzwi
   pkt_kuweta: !input pkt_kuweta
   deszcz_24h: !input deszcz_24h
-  prognoza_opad_3h: !input prognoza_opad_3h
-  prognoza_szansa_deszczu_3h: !input prognoza_szansa_deszczu_3h
-  pogoda: !input pogoda
+  prognoza: !input prognoza
   kuweta_licznik: !input kuweta_licznik
   kuweta_prog: !input kuweta_prog
   kuweta_obszar: !input kuweta_obszar
@@ -712,10 +694,11 @@ variables:
     {%- endfor -%}
     {{ ((now().timestamp() - ns.ost) / 60) | round(0) | int if ns.ost > 0 else 0 }}
   mokro: >-
-    {{ (deszcz_24h != '' and states(deszcz_24h) | float(0) >= 1)
-       or (prognoza_opad_3h != '' and states(prognoza_opad_3h) | float(0) >= 0.5)
-       or (prognoza_szansa_deszczu_3h != '' and states(prognoza_szansa_deszczu_3h) | float(0) >= 60)
-       or (pogoda != '' and states(pogoda) in ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy']) }}
+    {%- if deszcz_24h != '' and states(deszcz_24h) | is_number -%}
+      {{ states(deszcz_24h) | float(0) >= 1 }}
+    {%- else -%}
+      {{ prognoza != '' and states(prognoza) in ['rainy', 'pouring', 'lightning-rainy'] }}
+    {%- endif -%}
   brud: "{{ states(potrzeba) | float(0) if potrzeba != '' else states(pomocnik_brud) | float(0) }}"
 
 actions:
@@ -759,7 +742,7 @@ actions:
         target:
           entity_id: !input pomocnik_stan
         data:
-          value: "{{ dict(S, s='p', e=teraz) | to_json }}"
+          value: "{%- set J = dict(S, s='p', e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
       - if:
           - condition: template
             value_template: "{{ reakcja_powrot == 'pause' and ma_pauze }}"
@@ -791,7 +774,7 @@ actions:
               tytul: "{{ nazwa }}: Reinigung unterbrochen"
               tresc: Jemand ist nach Hause gekommen.
               tag: "robot_{{ robot.split('.')[1] }}_info"
-              rodzaj: informacja
+              typ: informacja
           - sequence: !input akcje_powiadomien
 
   - alias: Zyklus - Reinigungszustand, Überwachung, Probleme und Start
@@ -819,7 +802,7 @@ actions:
                 target:
                   entity_id: !input pomocnik_stan
                 data:
-                  value: "{{ dict(S, kl=licznik, k=S.get('k', 0) | int + nowe) | to_json }}"
+                  value: "{%- set J = dict(S, kl=licznik, k=S.get('k', 0) | int + nowe) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
               - if:
                   - condition: template
                     value_template: "{{ nowe > 0 and potrzeba == '' and pkt_kuweta | float(0) > 0 }}"
@@ -846,7 +829,7 @@ actions:
             target:
               entity_id: !input pomocnik_stan
             data:
-              value: "{{ dict(S, od=teraz - od_zmiany, s='z', w=0) | to_json }}"
+              value: "{%- set J = dict(S, od=teraz - od_zmiany, s='z', w=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
 
       - alias: Überwachung der laufenden Reinigung
         if:
@@ -896,7 +879,7 @@ actions:
                             target:
                               entity_id: !input pomocnik_stan
                             data:
-                              value: "{{ dict(S, od=0, k=0, s='', e=teraz) | to_json }}"
+                              value: "{%- set J = dict(S, od=0, k=0, s='', e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                           - action: input_text.set_value
                             target:
                               entity_id: !input pomocnik_powod
@@ -913,7 +896,7 @@ actions:
                             data:
                               value: >-
                                 {%- set l = (S.get('m', []) + ([m2 | round(0) | int] if m2 | float > 0 else []))[-5:] -%}
-                                {{ dict(S, od=0, z=teraz, k=0, w=0, s='', m=l, e=teraz, pz=0) | to_json }}
+                                {%- set J = dict(S, od=0, z=teraz, k=0, w=0, s='', m=l, e=teraz, pz=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}
                           - if:
                               - condition: template
                                 value_template: "{{ potrzeba == '' }}"
@@ -944,7 +927,7 @@ actions:
                                   tresc: >-
                                     Reinigung beendet nach {{ (czas_s | int / 60) | round(0) | int }} min{{ (', ' ~ (m2 | round(0) | int) ~ ' ' ~ jedn) if m2 | float > 0 else '' }}.
                                   tag: "robot_{{ robot.split('.')[1] }}_info"
-                                  rodzaj: informacja
+                                  typ: informacja
                               - sequence: !input akcje_powiadomien
                       - alias: Reinigung außerhalb der Automation, nicht vollständig - keine Benachrichtigung
                         conditions:
@@ -955,14 +938,14 @@ actions:
                             target:
                               entity_id: !input pomocnik_stan
                             data:
-                              value: "{{ dict(S, od=0, w=0, s='', pz=0) | to_json }}"
+                              value: "{%- set J = dict(S, od=0, w=0, s='', pz=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                     default:
                       - alias: Unterbrochen - später neuer Versuch
                         action: input_text.set_value
                         target:
                           entity_id: !input pomocnik_stan
                         data:
-                          value: "{{ dict(S, od=0, w=0, s='', e=teraz, pz=0) | to_json }}"
+                          value: "{%- set J = dict(S, od=0, w=0, s='', e=teraz, pz=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                       - action: input_datetime.set_datetime
                         target:
                           entity_id: !input pomocnik_nastepne
@@ -983,7 +966,7 @@ actions:
                               tresc: >-
                                 Der Roboter ist zur Station zurückgekehrt, aber die Reinigung ist nicht vollständig ({{ (czas_s | int / 60) | round(0) | int }} min{{ (', ' ~ (m2 | round(0) | int) ~ ' ' ~ jedn) if m2 | float > 0 else '' }}). Neuer Versuch in {{ ponowienie_godz }} h.
                               tag: "robot_{{ robot.split('.')[1] }}_info"
-                              rodzaj: informacja
+                              typ: informacja
                           - sequence: !input akcje_powiadomien
 
               - alias: Zeitlimit der Reinigung seit dem Start
@@ -1003,7 +986,7 @@ actions:
                     target:
                       entity_id: !input pomocnik_stan
                     data:
-                      value: "{{ dict(S, od=0, w=0, s='', e=teraz, pz=0) | to_json }}"
+                      value: "{%- set J = dict(S, od=0, w=0, s='', e=teraz, pz=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                   - action: input_datetime.set_datetime
                     target:
                       entity_id: !input pomocnik_nastepne
@@ -1019,7 +1002,7 @@ actions:
                       tresc: >-
                         Der Roboter hat die Reinigung nicht in {{ max_czas_godz }} h beendet (Zustand: {{ st }}{{ (', Fehler: ' ~ kod_bledu) if kod_bledu != '' else '' }}). Ich habe ihn zur Station geschickt, neuer Versuch in {{ ponowienie_godz }} h.
                       tag: "robot_{{ robot.split('.')[1] }}_info"
-                      rodzaj: informacja
+                      typ: informacja
                   - sequence: !input akcje_powiadomien
 
               - alias: Pause ohne Fehlercode - fortsetzen
@@ -1040,7 +1023,7 @@ actions:
                     target:
                       entity_id: !input pomocnik_stan
                     data:
-                      value: "{{ dict(S, w=S.get('w', 0) | int + 1, wr=teraz) | to_json }}"
+                      value: "{%- set J = dict(S, w=S.get('w', 0) | int + 1, wr=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                   - action: input_text.set_value
                     target:
                       entity_id: !input pomocnik_powod
@@ -1056,7 +1039,7 @@ actions:
                     target:
                       entity_id: !input pomocnik_stan
                     data:
-                      value: "{{ dict(S, pz=0) | to_json }}"
+                      value: "{%- set J = dict(S, pz=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                   - action: input_text.set_value
                     target:
                       entity_id: !input pomocnik_powod
@@ -1079,7 +1062,7 @@ actions:
                         target:
                           entity_id: !input pomocnik_stan
                         data:
-                          value: "{{ dict(S, pz=1) | to_json }}"
+                          value: "{%- set J = dict(S, pz=1) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                       - action: input_text.set_value
                         target:
                           entity_id: !input pomocnik_powod
@@ -1106,7 +1089,7 @@ actions:
               S: >-
                 {%- set s = states(pomocnik_stan) -%}
                 {{ s | from_json if s.startswith('{') else {} }}
-              typ: >-
+              typ_problemu: >-
                 {%- if st == 'unavailable' and od_zmiany >= 300 -%}niedostepny
                 {%- elif st == 'error' -%}blad
                 {%- elif st not in stany_stacji and stacja_problem | bool -%}stacja
@@ -1121,48 +1104,48 @@ actions:
                      and (now() - states[sensor_powierzchni].last_changed).total_seconds() >= utknal_godz | float(2) * 3600 -%}utknal
                 {%- endif -%}
               opis: >-
-                {%- if typ == 'niedostepny' -%}Keine Verbindung zum Roboter seit {{ (od_zmiany / 60) | int }} min. Prüfen Sie Stromversorgung der Station und WLAN.
-                {%- elif typ == 'blad' -%}Der Roboter hat einen Fehler gemeldet{{ (': ' ~ kod_bledu) if kod_bledu != '' else '' }}. Prüfen Sie Roboter und Station.
-                {%- elif typ == 'stacja' -%}Stationsproblem: {{ states(sensor_alarmow_stacji) }}.
-                {%- elif typ == 'pauza' -%}Der Roboter ist pausiert seit {{ (od_zmiany / 60) | int }} min{{ (' (' ~ kod_bledu ~ ')') if kod_bledu != '' else '' }}.
-                {%- elif typ == 'utknal' -%}Der Roboter steckt fest: seit {{ (od_zmiany / 3600) | round(1) }} h keine Änderung (Zustand: {{ st }}).
+                {%- if typ_problemu == 'niedostepny' -%}Keine Verbindung zum Roboter seit {{ (od_zmiany / 60) | int }} min. Prüfen Sie Stromversorgung der Station und WLAN.
+                {%- elif typ_problemu == 'blad' -%}Der Roboter hat einen Fehler gemeldet{{ (': ' ~ kod_bledu) if kod_bledu != '' else '' }}. Prüfen Sie Roboter und Station.
+                {%- elif typ_problemu == 'stacja' -%}Stationsproblem: {{ states(sensor_alarmow_stacji) }}.
+                {%- elif typ_problemu == 'pauza' -%}Der Roboter ist pausiert seit {{ (od_zmiany / 60) | int }} min{{ (' (' ~ kod_bledu ~ ')') if kod_bledu != '' else '' }}.
+                {%- elif typ_problemu == 'utknal' -%}Der Roboter steckt fest: seit {{ (od_zmiany / 3600) | round(1) }} h keine Änderung (Zustand: {{ st }}).
                 {%- endif -%}
               tag: "robot_{{ robot.split('.')[1] }}_problem"
               problem_teraz: "{{ S.get('pt', '') }}"
-              ok_od_5_min: "{{ typ == '' and st not in ['unavailable', 'unknown', 'error'] and od_zmiany >= 300 }}"
+              ok_od_5_min: "{{ typ_problemu == '' and st not in ['unavailable', 'unknown', 'error'] and od_zmiany >= 300 }}"
           - choose:
               - alias: Neues Problem - sofort benachrichtigen
                 conditions:
                   - condition: template
-                    value_template: "{{ typ != '' and problem_teraz == '' }}"
+                    value_template: "{{ typ_problemu != '' and problem_teraz == '' }}"
                 sequence:
                   - action: input_text.set_value
                     target:
                       entity_id: !input pomocnik_stan
                     data:
-                      value: "{{ dict(S, pt=typ, po=teraz, pn=teraz) | to_json }}"
+                      value: "{%- set J = dict(S, pt=typ_problemu, po=teraz, pn=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                   - variables:
                       tytul: "{{ nazwa }} braucht Aufmerksamkeit"
                       tresc: "{{ opis }}"
-                      rodzaj: problem
+                      typ: problem
                   - sequence: !input akcje_powiadomien
               - alias: Problem besteht - Erinnerung
                 conditions:
                   - condition: template
                     value_template: >-
-                      {{ typ != '' and problem_teraz != '' and not noc | bool
+                      {{ typ_problemu != '' and problem_teraz != '' and not noc | bool
                          and teraz - S.get('pn', 0) | int >= przypomnienie_godz | float(6) * 3600 }}
                 sequence:
                   - action: input_text.set_value
                     target:
                       entity_id: !input pomocnik_stan
                     data:
-                      value: "{{ dict(S, pt=typ, pn=teraz) | to_json }}"
+                      value: "{%- set J = dict(S, pt=typ_problemu, pn=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                   - variables:
                       tytul: "Erinnerung: {{ nazwa }}"
                       tresc: >-
                         Problem seit {{ S.get('po', teraz) | int | timestamp_custom('%d.%m %H:%M') }}. {{ opis }}
-                      rodzaj: przypomnienie
+                      typ: przypomnienie
                   - sequence: !input akcje_powiadomien
               - alias: Problem behoben
                 conditions:
@@ -1173,11 +1156,11 @@ actions:
                     target:
                       entity_id: !input pomocnik_stan
                     data:
-                      value: "{{ dict(S, pt='', po=0, pn=0) | to_json }}"
+                      value: "{%- set J = dict(S, pt='', po=0, pn=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                   - variables:
                       tytul: "{{ nazwa }}: Problem behoben"
                       tresc: Der Roboter arbeitet normal.
-                      rodzaj: rozwiazany
+                      typ: rozwiazany
                   - sequence: !input akcje_powiadomien
 
       - alias: Start - Entscheidung und Ausführung
@@ -1272,7 +1255,7 @@ actions:
                 target:
                   entity_id: !input pomocnik_stan
                 data:
-                  value: "{{ dict(S, od=teraz, s='a', w=0, wr=0, p=teraz, pz=0) | to_json }}"
+                  value: "{%- set J = dict(S, od=teraz, s='a', w=0, wr=0, p=teraz, pz=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
               - action: input_datetime.set_datetime
                 target:
                   entity_id: !input pomocnik_nastepne
@@ -1326,7 +1309,7 @@ actions:
                           tytul: "{{ nazwa }}: Reinigung gestartet"
                           tresc: "Grund: {{ nazwa_reguly }}, Schmutz {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}."
                           tag: "robot_{{ robot.split('.')[1] }}_info"
-                          rodzaj: informacja
+                          typ: informacja
                       - sequence: !input akcje_powiadomien
                 else:
                   - variables:
@@ -1348,7 +1331,7 @@ actions:
                       value: >-
                         {%- set s = states(pomocnik_stan) -%}
                         {%- set S2 = s | from_json if s.startswith('{') else {} -%}
-                        {{ dict(S2, od=0, s='', e=teraz) | to_json }}
+                        {%- set J = dict(S2, od=0, s='', e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}
                   - if:
                       - condition: template
                         value_template: "{{ states(robot) not in stany_stacji }}"
@@ -1367,7 +1350,7 @@ actions:
                       tresc: >-
                         Der Roboter hat die Reinigung nicht begonnen (Zustand: {{ stan_po }}{{ (', ' ~ kod) if kod != '' else '' }}). Neuer Versuch in {{ ponowienie_godz }} h.
                       tag: "robot_{{ robot.split('.')[1] }}_info"
-                      rodzaj: informacja
+                      typ: informacja
                   - sequence: !input akcje_powiadomien
 
       - alias: Katzentoilette - schnelle Bereichsreinigung
@@ -1407,7 +1390,7 @@ actions:
                 target:
                   entity_id: !input pomocnik_stan
                 data:
-                  value: "{{ dict(S, od=teraz, s='k', kf=teraz) | to_json }}"
+                  value: "{%- set J = dict(S, od=teraz, s='k', kf=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
               - action: input_text.set_value
                 target:
                   entity_id: !input pomocnik_powod
@@ -1434,7 +1417,7 @@ actions:
                       value: >-
                         {%- set s = states(pomocnik_stan) -%}
                         {%- set S2 = s | from_json if s.startswith('{') else {} -%}
-                        {{ dict(S2, od=0, s='', e=teraz) | to_json }}
+                        {%- set J = dict(S2, od=0, s='', e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}
                   - action: input_text.set_value
                     target:
                       entity_id: !input pomocnik_powod
