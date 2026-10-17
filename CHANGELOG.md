@@ -1,5 +1,11 @@
 # Zmiany
 
+## 2026-10-17 (2)
+
+- **Inteligentny robot sprzątający – każda marka** 1.1.0. Istniejące wejścia bez zmian.
+  - Nowe wejście **Powiadamiaj o zakończeniu pełnego sprzątania** (`powiadom_o_koncu`). „Powiadamiaj o starcie sprzątania” (`powiadom_o_starcie`) dotyczy teraz tylko startu.
+  - Nowe opcjonalne źródło główne pogody: opad z ostatnich 24 h (`pogoda_opad_24h_wstecz`) i deszcz teraz (`pogoda_deszcz_teraz`). Gdy jest niedostępne, używany jest zapas (sensor opadu z 24 h, potem encja pogody), a powód decyzji mówi „prognoza zapasowa”. Bez żadnych danych automatyzacja liczy ostrożnie, jak po deszczu.
+
 ## 2026-10-17
 
 - Nowa pozycja **Inteligentny robot sprzątający – każda marka** 1.0.0 (`roboty_inteligentne.yaml`, wersje `_en` i `_de`). Robot sprząta według licznika brudu (czas, obecność domowników, otwieranie drzwi z uwzględnieniem deszczu, kuweta), a nie według sztywnego harmonogramu. Trzy reguły startu: pusty dom przy niższym progu, zwykłe okno przy pełnym progu, maksymalna przerwa. Nigdy w ciszy nocnej, przy niskiej baterii ani częściej niż ustawiony odstęp. Pełne sprzątanie liczone po powrocie do stacji (czas od startu i typowa powierzchnia), wznawianie pauz bez kodu błędu, limit czasu od startu, „nie wystartował”, rozpoznanie sprzątania uruchomionego ręcznie, szybkie sprzątanie obszaru przy kuwecie, powiadomienia o problemach z przypomnieniami. Każda decyzja ma powód zapisany w pomocniku. Tryb podglądu bez komend do robota. Dotychczasowy blueprint **Robot sprzątający pod nieobecność** zostaje bez zmian.

@@ -19,7 +19,11 @@ Licznik rośnie, a pełne sprzątanie go zeruje. Domyślnie:
 | otwarcie wybranych drzwi zewnętrznych | 2, a po deszczu 4 |
 | użycie kuwety (licznik użyć) | 1 |
 
-Deszcz („mokro”) to co najmniej 1 mm opadu w ciągu 24 h (sensor opadu), a bez tego sensora deszcz teraz według encji pogody. Oba są opcjonalne. Zamiast licznika brudu można podać własny licznik potrzeby.
+Deszcz („mokro”) sprawdzany jest w tej kolejności:
+1. **Źródło główne** (opcjonalne): opad z ostatnich 24 h (co najmniej 1 mm) albo czujnik „pada teraz”.
+2. **Zapas**: sensor opadu z 24 h, a bez niego deszcz teraz według encji pogody.
+
+Gdy źródło główne jest podane, ale niedostępne, powód decyzji mówi „prognoza zapasowa”. Gdy nie ma ani źródła głównego, ani zapasu, automatyzacja liczy ostrożnie, jak po deszczu, i pisze to w powodzie. Zamiast licznika brudu można podać własny licznik potrzeby.
 
 ## Kiedy robot startuje
 
@@ -98,6 +102,8 @@ W polu **Akcje powiadomienia** dodaj dowolną akcję, np. `notify.mobile_app_two
 - `{{ typ }}`: `problem`, `przypomnienie`, `rozwiazany` albo `informacja`.
 
 Problem (brak łączności, błąd, problem stacji, długa pauza, robot utknął) wysyła powiadomienie od razu. Dopóki trwa, przypomnienie przychodzi co 6 h, a w ciszy nocnej czeka do rana. Gdy problem minie, przychodzi informacja „problem usunięty”.
+
+Opcjonalnie, osobnymi przełącznikami: **powiadomienie o starcie** sprzątania i **powiadomienie o zakończeniu** pełnego sprzątania (to samo kryterium co „Zakończono”). Przerwane sprzątanie i „nie wystartował” wysyłają powiadomienie zawsze.
 
 ## Ograniczenia
 

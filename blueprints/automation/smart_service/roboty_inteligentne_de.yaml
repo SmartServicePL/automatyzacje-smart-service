@@ -213,9 +213,26 @@ blueprint:
               multiple: true
               filter:
                 - domain: binary_sensor
+        pogoda_opad_24h_wstecz:
+          name: Niederschlag der letzten 24 Stunden - Hauptquelle (optional)
+          description: Niederschlagssensor in mm. Wenn angegeben und verfügbar, hat er Vorrang. Mindestens 1 mm = nass.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        pogoda_deszcz_teraz:
+          name: Regen jetzt - Hauptquelle (optional)
+          description: Regensensor (ein = es regnet) oder Sensor der Regenintensität (über 0 = es regnet).
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+                - domain: sensor
         deszcz_24h:
-          name: Niederschlag der letzten 24 Stunden (optional)
-          description: Niederschlagssensor in mm. Mindestens 1 mm = nass, Türpunkte werden verdoppelt.
+          name: Niederschlag der letzten 24 Stunden - Reserve (optional)
+          description: Niederschlagssensor in mm, verwendet ohne Hauptquelle. Mindestens 1 mm = nass, Türpunkte werden verdoppelt.
           default: ""
           selector:
             entity:
@@ -223,7 +240,7 @@ blueprint:
                 - domain: sensor
         prognoza:
           name: Wetter (optional)
-          description: Wetter-Entität, die ohne Niederschlagssensor für 24 Stunden verwendet wird. Regen jetzt = nass.
+          description: Wetter-Entität, verwendet ohne Hauptquelle und ohne Niederschlagssensor für 24 Stunden. Regen jetzt = nass.
           default: ""
           selector:
             entity:
@@ -545,7 +562,12 @@ blueprint:
           selector:
             action: {}
         powiadom_o_starcie:
-          name: Auch über Start und Ende benachrichtigen
+          name: Beim Start der Reinigung benachrichtigen
+          default: false
+          selector:
+            boolean: {}
+        powiadom_o_koncu:
+          name: Nach einer vollständigen Reinigung benachrichtigen
           default: false
           selector:
             boolean: {}
@@ -606,6 +628,8 @@ variables:
   pkt_obecnosc: !input pkt_obecnosc
   pkt_drzwi: !input pkt_drzwi
   pkt_kuweta: !input pkt_kuweta
+  pogoda_opad_24h_wstecz: !input pogoda_opad_24h_wstecz
+  pogoda_deszcz_teraz: !input pogoda_deszcz_teraz
   deszcz_24h: !input deszcz_24h
   prognoza: !input prognoza
   kuweta_licznik: !input kuweta_licznik
@@ -640,6 +664,7 @@ variables:
   pauza_alarm_min: !input pauza_alarm_min
   przypomnienie_godz: !input przypomnienie_godz
   powiadom_o_starcie: !input powiadom_o_starcie
+  powiadom_o_koncu: !input powiadom_o_koncu
   nazwa: "{{ state_attr(robot, 'friendly_name') or robot }}"
   teraz: "{{ now().timestamp() | int }}"
   st: "{{ states(robot) }}"
@@ -693,11 +718,32 @@ variables:
       {%- endif -%}
     {%- endfor -%}
     {{ ((now().timestamp() - ns.ost) / 60) | round(0) | int if ns.ost > 0 else 0 }}
+  zrodlo_pogody: >-
+    {%- set opad_ok = pogoda_opad_24h_wstecz != '' and states(pogoda_opad_24h_wstecz) | is_number -%}
+    {%- set teraz_ok = pogoda_deszcz_teraz != '' and states(pogoda_deszcz_teraz) not in ['unknown', 'unavailable', ''] -%}
+    {%- set glowne = pogoda_opad_24h_wstecz != '' or pogoda_deszcz_teraz != '' -%}
+    {%- set zapas_ok = (deszcz_24h != '' and states(deszcz_24h) | is_number)
+                       or (prognoza != '' and states(prognoza) not in ['unknown', 'unavailable', '']) -%}
+    {%- if opad_ok or teraz_ok -%}glowne
+    {%- elif zapas_ok -%}{{ 'rezerwa' if glowne else 'zapas' }}
+    {%- elif pogoda_opad_24h_wstecz != '' -%}nieznane
+    {%- else -%}brak
+    {%- endif -%}
   mokro: >-
-    {%- if deszcz_24h != '' and states(deszcz_24h) | is_number -%}
-      {{ states(deszcz_24h) | float(0) >= 1 }}
+    {%- if zrodlo_pogody == 'glowne' -%}
+      {%- set t = states(pogoda_deszcz_teraz) if pogoda_deszcz_teraz != '' else '' -%}
+      {{ (pogoda_opad_24h_wstecz != '' and states(pogoda_opad_24h_wstecz) | float(0) >= 1)
+         or t == 'on' or (t | is_number and t | float(0) > 0) }}
+    {%- elif zrodlo_pogody in ['rezerwa', 'zapas'] -%}
+      {%- if deszcz_24h != '' and states(deszcz_24h) | is_number -%}
+        {{ states(deszcz_24h) | float(0) >= 1 }}
+      {%- else -%}
+        {{ prognoza != '' and states(prognoza) in ['rainy', 'pouring', 'lightning-rainy'] }}
+      {%- endif -%}
+    {%- elif zrodlo_pogody == 'nieznane' -%}
+      {{ true }}
     {%- else -%}
-      {{ prognoza != '' and states(prognoza) in ['rainy', 'pouring', 'lightning-rainy'] }}
+      {{ false }}
     {%- endif -%}
   brud: "{{ states(potrzeba) | float(0) if potrzeba != '' else states(pomocnik_brud) | float(0) }}"
 
@@ -920,7 +966,7 @@ actions:
                           - sequence: !input akcje_po_sprzataniu
                           - if:
                               - condition: template
-                                value_template: "{{ powiadom_o_starcie }}"
+                                value_template: "{{ powiadom_o_koncu }}"
                             then:
                               - variables:
                                   tytul: "{{ nazwa }}: gereinigt"
@@ -1210,7 +1256,7 @@ actions:
                 {%- elif blokada_wlaczona | bool -%}
                   Reinigungssperre ist aktiv
                 {%- elif regula == '' -%}
-                  Schmutz {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}{{ ', leeres Haus ab ' ~ (pusty_dom_od[:5]) if tryb_obecnosci == 'pusty_dom' else '' }}
+                  Schmutz {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}{{ ', leeres Haus ab ' ~ (pusty_dom_od[:5]) if tryb_obecnosci == 'pusty_dom' else '' }}{{ ', Ersatzprognose' if zrodlo_pogody == 'rezerwa' else (', Wetter unbekannt - zähle wie nach Regen' if zrodlo_pogody == 'nieznane' else '') }}
                 {%- endif -%}
               nazwa_reguly: >-
                 {%- if regula == 'pusty' -%}leeres Haus{%- elif regula == 'brud' -%}Schmutzschwelle{%- else -%}maximale Pause{%- endif -%}
