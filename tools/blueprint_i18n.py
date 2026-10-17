@@ -34,7 +34,7 @@ LANGUAGES = ("en", "de")
 # Keys whose plain string values are text for people.
 TEXT_KEYS = {
     "name", "description", "label", "alias", "stop", "title", "message",
-    "tytul", "tresc",
+    "tytul", "tresc", "nowy_powod",
 }
 # Mappings whose values (not keys) are labels shown to people.
 LABEL_MAPS: set[str] = set()
@@ -48,6 +48,7 @@ BLUEPRINTS = ROOT / "blueprints" / "automation" / "smart_service"
 PAIRS = (
     (BLUEPRINTS / "koszenie.yaml", ROOT / "i18n" / "koszenie.yaml"),
     (BLUEPRINTS / "roboty_sprzatajace.yaml", ROOT / "i18n" / "roboty_sprzatajace.yaml"),
+    (BLUEPRINTS / "roboty_inteligentne.yaml", ROOT / "i18n" / "roboty_inteligentne.yaml"),
 )
 
 POLISH_LETTERS = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")

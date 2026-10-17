@@ -1,0 +1,1442 @@
+blueprint:
+  name: Smart Service - inteligentny robot sprzątający
+  description: |
+    Robot sprząta wtedy, gdy w domu jest brudno, a nie według sztywnego harmonogramu.
+    Działa z każdym robotem z encją vacuum. Jedna automatyzacja = jeden robot.
+
+    Licznik brudu rośnie z czasem, gdy ktoś jest w domu, przy otwieraniu drzwi
+    (więcej po deszczu) i przy używaniu kuwety. Robot startuje:
+    - w dni i godziny pustego domu, gdy wszyscy wyszli i brud przekroczył część progu,
+    - w zwykłym oknie godzin, gdy brud przekroczył cały próg,
+    - zawsze po przekroczeniu maksymalnej przerwy między sprzątaniami.
+    Nigdy w ciszy nocnej, przy niskiej baterii ani częściej niż ustawiony odstęp.
+
+    Nadzór: sprzątanie jest wykonane dopiero po powrocie do stacji, gdy robot
+    pracował dość długo i posprzątał typową dla siebie powierzchnię. Pauza bez
+    kodu błędu jest wznawiana, przy błędzie przychodzi powiadomienie i przypomnienia.
+    Każda decyzja ma powód zapisany w pomocniku tekstowym.
+
+    Tryb podglądu: automatyzacja tylko zapisuje, co by zrobiła, i nie wysyła komend.
+
+    Pomocniki (bez wartości początkowej): Data i godzina, Liczba 0-300,
+    Tekst (maks. 255 znaków) na stan, Tekst (maks. 255 znaków) na powód.
+  domain: automation
+  author: Smart Service
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/roboty_inteligentne.yaml
+  input:
+    robot_sekcja:
+      name: Robot
+      icon: mdi:robot-vacuum
+      input:
+        robot:
+          name: Robot
+          selector:
+            entity:
+              filter:
+                - domain: vacuum
+        bateria:
+          name: Bateria robota (opcjonalnie)
+          description: Sensor baterii w procentach. Puste = bez sprawdzania baterii.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: battery
+        min_bateria:
+          name: Minimalna bateria do startu
+          default: 40
+          selector:
+            number:
+              min: 10
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        sensor_bledu:
+          name: Sensor błędu robota (opcjonalnie)
+          description: Sensor z kodem lub opisem błędu. Stan "OK", "0" lub "brak" oznacza brak błędu.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        sensor_alarmow_stacji:
+          name: Sensor alarmów stacji (opcjonalnie)
+          description: Sensor problemów stacji (woda, worek, zbiorniki). Stan "OK" oznacza brak problemu.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        sensor_powierzchni:
+          name: Sensor posprzątanej powierzchni (opcjonalnie)
+          description: Powierzchnia bieżącego lub ostatniego sprzątania w m². Służy do rozpoznania pełnego sprzątania.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        sensor_czasu:
+          name: Sensor czasu sprzątania (opcjonalnie)
+          description: Czas bieżącego lub ostatniego sprzątania (sekundy, minuty lub godziny).
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        start_takze_z_idle:
+          name: Dopuszczaj start także ze stanu "bezczynny"
+          description: Niektóre roboty po naładowaniu raportują "idle" zamiast "docked". Włącz tylko, jeśli Twój robot tak robi.
+          default: false
+          selector:
+            boolean: {}
+        reakcja_powrot:
+          name: Gdy ktoś wróci do pustego domu podczas sprzątania
+          default: dock
+          selector:
+            select:
+              options:
+                - label: Odeślij robota do stacji (dokończy później)
+                  value: dock
+                - label: Wstrzymaj robota (jeśli robot to obsługuje)
+                  value: pause
+                - label: Sprzątaj dalej
+                  value: none
+        obszary:
+          name: Obszary do sprzątania (opcjonalnie)
+          description: >-
+            Obszary Home Assistant przypisane do segmentów mapy robota. Puste = cały dom.
+            Wymaga Home Assistant 2026.3+ i robota z obsługą "Sprzątaj obszar".
+          default: []
+          selector:
+            area:
+              multiple: true
+        wlasny_start:
+          name: Użyj własnych akcji startu zamiast standardowych
+          default: false
+          selector:
+            boolean: {}
+        akcje_startu:
+          name: Własne akcje startu (opcjonalnie)
+          description: Np. usługa integracji producenta z listą pokoi i trybem mopowania. Używane tylko po włączeniu opcji powyżej.
+          default: []
+          selector:
+            action: {}
+    pomocniki_sekcja:
+      name: Pomocniki (stan automatyzacji)
+      icon: mdi:database
+      input:
+        pomocnik_nastepne:
+          name: Pomocnik - najwcześniejszy następny start
+          description: Pomocnik Data i godzina (z datą i godziną). Automatyzacja sama go ustawia.
+          selector:
+            entity:
+              filter:
+                - domain: input_datetime
+        pomocnik_brud:
+          name: Pomocnik - licznik brudu
+          description: Pomocnik Liczba (min 0, maks 300). Automatyzacja sama go ustawia.
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+        pomocnik_stan:
+          name: Pomocnik - stan robota
+          description: Pomocnik Tekst o długości maks. 255 znaków. Automatyzacja zapisuje w nim swój stan.
+          selector:
+            entity:
+              filter:
+                - domain: input_text
+        pomocnik_powod:
+          name: Pomocnik - powód ostatniej decyzji
+          description: Pomocnik Tekst o długości maks. 255 znaków. Tu widać, dlaczego robot sprząta albo czeka.
+          selector:
+            entity:
+              filter:
+                - domain: input_text
+        tryb_podgladu:
+          name: Tryb podglądu
+          description: Włączony = automatyzacja tylko zapisuje, co by zrobiła, i nie wysyła komend do robota.
+          default: true
+          selector:
+            boolean: {}
+    brud_sekcja:
+      name: Licznik brudu
+      icon: mdi:shoe-print
+      input:
+        pkt_baza:
+          name: Punkty co godzinę
+          description: Np. 1, gdy w domu są zwierzęta, 0 bez zwierząt.
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 20
+              step: 1
+              mode: box
+        pkt_obecnosc:
+          name: Punkty co godzinę, gdy ktoś jest w domu (7-22)
+          default: 3
+          selector:
+            number:
+              min: 0
+              max: 20
+              step: 1
+              mode: box
+        pkt_drzwi:
+          name: Punkty za otwarcie drzwi
+          default: 2
+          selector:
+            number:
+              min: 0
+              max: 20
+              step: 1
+              mode: box
+        pkt_kuweta:
+          name: Punkty za użycie kuwety
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 20
+              step: 1
+              mode: box
+        drzwi:
+          name: Drzwi zewnętrzne (opcjonalnie)
+          description: Każde otwarcie dodaje punkty, po deszczu podwójne.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+        deszcz_24h:
+          name: Opad z 24 godzin (opcjonalnie)
+          description: Sensor opadu w mm. Co najmniej 1 mm = mokro, punkty za drzwi są podwójne.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        prognoza_opad_3h:
+          name: Prognoza opadu na 3 godziny (opcjonalnie)
+          description: Sensor opadu w mm. Co najmniej 0,5 mm = mokro.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        prognoza_szansa_deszczu_3h:
+          name: Szansa deszczu w 3 godziny (opcjonalnie)
+          description: Sensor w procentach. Co najmniej 60% = mokro.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        pogoda:
+          name: Pogoda (opcjonalnie)
+          description: Encja pogody używana, gdy brak czujników opadu. Deszcz teraz = mokro.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: weather
+        kuweta_licznik:
+          name: Licznik użyć kuwety (opcjonalnie)
+          description: Rosnący licznik użyć kuwety. Spadek (np. zerowanie o północy) jest pomijany.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                - domain: counter
+                - domain: input_number
+        kuweta_prog:
+          name: Szybkie sprzątanie po tylu użyciach kuwety
+          default: 4
+          selector:
+            number:
+              min: 1
+              max: 20
+              step: 1
+              mode: box
+        kuweta_obszar:
+          name: Obszar szybkiego sprzątania przy kuwecie (opcjonalnie)
+          description: Wymaga robota z obsługą "Sprzątaj obszar". Puste = bez szybkiego sprzątania.
+          default: []
+          selector:
+            area:
+              multiple: true
+        potrzeba:
+          name: Własny licznik potrzeby zamiast licznika brudu (opcjonalnie)
+          description: Np. input_number liczony inną automatyzacją. Puste = licznik brudu z tej automatyzacji.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: counter
+                - domain: sensor
+        prog_potrzeby:
+          name: Próg brudu
+          default: 100
+          selector:
+            number:
+              min: 1
+              max: 300
+              step: 1
+              mode: box
+    harmonogram_sekcja:
+      name: Kiedy sprzątać
+      icon: mdi:calendar-clock
+      input:
+        tryb_obecnosci:
+          name: Tryb
+          default: pusty_dom
+          selector:
+            select:
+              options:
+                - label: Pusty dom z niższym progiem i zwykłe okno
+                  value: pusty_dom
+                - label: Tylko zwykłe okno, bez względu na obecność
+                  value: zawsze
+        obecnosc:
+          name: Domownicy
+          description: >-
+            Osoby (person) z działającym lokalizatorem. Stan nieznany krócej niż dobę
+            liczy się jako obecność. Nie wybieraj czujników ruchu w domu ze zwierzętami.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: person
+                - domain: device_tracker
+                - domain: group
+                - domain: binary_sensor
+                - domain: input_boolean
+        pomin_nieznane:
+          name: Pomijaj domowników ze stanem nieznanym dłużej niż dobę
+          default: true
+          selector:
+            boolean: {}
+        opoznienie_min:
+          name: Start po tylu minutach pustego domu
+          default: 10
+          selector:
+            number:
+              min: 0
+              max: 120
+              step: 5
+              unit_of_measurement: min
+              mode: slider
+        pusty_dom_dni:
+          name: Dni pustego domu
+          default: [mon, tue, wed, thu, fri]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Poniedziałek
+                  value: mon
+                - label: Wtorek
+                  value: tue
+                - label: Środa
+                  value: wed
+                - label: Czwartek
+                  value: thu
+                - label: Piątek
+                  value: fri
+                - label: Sobota
+                  value: sat
+                - label: Niedziela
+                  value: sun
+        pusty_dom_od:
+          name: Pusty dom - początek okna
+          default: "08:15:00"
+          selector:
+            time: {}
+        pusty_dom_do:
+          name: Pusty dom - koniec okna (najpóźniejszy start)
+          default: "13:30:00"
+          selector:
+            time: {}
+        pusty_dom_procent:
+          name: Pusty dom - wystarczy taki procent progu brudu
+          default: 60
+          selector:
+            number:
+              min: 10
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        ogranicz_godziny:
+          name: Zwykłe okno godzin
+          description: Wyłączone = zwykły start o dowolnej porze (poza ciszą nocną).
+          default: true
+          selector:
+            boolean: {}
+        okno_od:
+          name: Zwykłe okno - początek
+          default: "12:00:00"
+          selector:
+            time: {}
+        okno_do:
+          name: Zwykłe okno - koniec (najpóźniejszy start)
+          default: "18:00:00"
+          selector:
+            time: {}
+        ogranicz_dni:
+          name: Zwykłe okno tylko w wybrane dni
+          default: false
+          selector:
+            boolean: {}
+        dni:
+          name: Dni zwykłego okna
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Poniedziałek
+                  value: mon
+                - label: Wtorek
+                  value: tue
+                - label: Środa
+                  value: wed
+                - label: Czwartek
+                  value: thu
+                - label: Piątek
+                  value: fri
+                - label: Sobota
+                  value: sat
+                - label: Niedziela
+                  value: sun
+        odstep_godz:
+          name: Nie częściej niż co
+          default: 12
+          selector:
+            number:
+              min: 2
+              max: 336
+              step: 1
+              unit_of_measurement: h
+              mode: box
+        maks_przerwa_godz:
+          name: Maksymalna przerwa między sprzątaniami
+          description: Po tym czasie robot sprząta bez względu na licznik brudu (w oknie godzin).
+          default: 48
+          selector:
+            number:
+              min: 6
+              max: 336
+              step: 1
+              unit_of_measurement: h
+              mode: box
+        ponowienie_godz:
+          name: Ponowienie po nieudanym lub przerwanym sprzątaniu
+          default: 3
+          selector:
+            number:
+              min: 0.5
+              max: 24
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        cisza_nocna:
+          name: Cisza nocna (opcjonalnie)
+          description: Przełącznik lub harmonogram. Włączony = żadnego startu, wznowienia ani przypomnień.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+                - domain: schedule
+                - domain: binary_sensor
+        blokady:
+          name: Blokady (opcjonalnie)
+          description: Przełączniki lub czujniki, których stan "on" blokuje sprzątanie (goście, urlop).
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: input_boolean
+                - domain: binary_sensor
+                - domain: switch
+    nadzor_sekcja:
+      name: Nadzór i powiadomienia
+      icon: mdi:bell-alert
+      input:
+        min_czas_sprzatania_min:
+          name: Pełne sprzątanie trwa co najmniej
+          description: Czas od startu do powrotu do stacji.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 120
+              step: 1
+              unit_of_measurement: min
+              mode: box
+        potwierdzenie_w_stacji_min:
+          name: Koniec sprzątania po tylu minutach w stacji
+          description: Dłużej niż mycie mopów w trakcie sprzątania.
+          default: 10
+          selector:
+            number:
+              min: 3
+              max: 60
+              step: 1
+              unit_of_measurement: min
+              mode: box
+        min_powierzchnia_procent:
+          name: Pełne sprzątanie - co najmniej taki procent typowej powierzchni
+          description: Typowa powierzchnia to mediana z 5 ostatnich pełnych sprzątań.
+          default: 70
+          selector:
+            number:
+              min: 10
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        max_czas_godz:
+          name: Limit czasu sprzątania (potem powrót do stacji)
+          default: 5
+          selector:
+            number:
+              min: 0.5
+              max: 12
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        utknal_godz:
+          name: Robot utknął po tylu godzinach bez zmiany stanu poza stacją
+          default: 2
+          selector:
+            number:
+              min: 0.5
+              max: 12
+              step: 0.5
+              unit_of_measurement: h
+              mode: box
+        wznowienia_max:
+          name: Wznowienia po pauzie bez kodu błędu
+          default: 2
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 1
+              mode: box
+        pauza_alarm_min:
+          name: Pauza dłuższa niż
+          default: 10
+          selector:
+            number:
+              min: 5
+              max: 240
+              step: 5
+              unit_of_measurement: min
+              mode: slider
+        przypomnienie_godz:
+          name: Przypominaj o problemie co
+          default: 6
+          selector:
+            number:
+              min: 1
+              max: 48
+              step: 1
+              unit_of_measurement: h
+              mode: box
+        akcje_po_sprzataniu:
+          name: Akcje po pełnym sprzątaniu (opcjonalnie)
+          default: []
+          selector:
+            action: {}
+        powiadom_o_starcie:
+          name: Powiadamiaj także o starcie i zakończeniu
+          default: false
+          selector:
+            boolean: {}
+        akcje_powiadomien:
+          name: Akcje powiadomienia
+          description: >-
+            Akcje wykonywane przy każdym powiadomieniu, np. notify.mobile_app_telefon.
+            Zmienne: {{ tytul }}, {{ tresc }}, {{ tag }} (ten sam dla jednego problemu)
+            i {{ rodzaj }} (problem, przypomnienie, rozwiazany, informacja). Puste = bez powiadomień.
+          default: []
+          selector:
+            action: {}
+
+mode: queued
+max: 20
+max_exceeded: silent
+trace:
+  stored_traces: 50
+
+triggers:
+  - trigger: time_pattern
+    minutes: "/5"
+    id: cykl
+  - trigger: homeassistant
+    event: start
+    id: cykl
+  - trigger: time_pattern
+    minutes: "0"
+    id: godzina
+  - trigger: state
+    entity_id: !input drzwi
+    from: "off"
+    to: "on"
+    id: drzwi
+  - trigger: state
+    entity_id: !input obecnosc
+    to: ~
+    id: obecnosc
+
+variables:
+  robot: !input robot
+  bateria: !input bateria
+  min_bateria: !input min_bateria
+  sensor_bledu: !input sensor_bledu
+  sensor_alarmow_stacji: !input sensor_alarmow_stacji
+  sensor_powierzchni: !input sensor_powierzchni
+  sensor_czasu: !input sensor_czasu
+  start_takze_z_idle: !input start_takze_z_idle
+  reakcja_powrot: !input reakcja_powrot
+  obszary: !input obszary
+  wlasny_start: !input wlasny_start
+  pomocnik_nastepne: !input pomocnik_nastepne
+  pomocnik_brud: !input pomocnik_brud
+  pomocnik_stan: !input pomocnik_stan
+  pomocnik_powod: !input pomocnik_powod
+  tryb_podgladu: !input tryb_podgladu
+  pkt_baza: !input pkt_baza
+  pkt_obecnosc: !input pkt_obecnosc
+  pkt_drzwi: !input pkt_drzwi
+  pkt_kuweta: !input pkt_kuweta
+  deszcz_24h: !input deszcz_24h
+  prognoza_opad_3h: !input prognoza_opad_3h
+  prognoza_szansa_deszczu_3h: !input prognoza_szansa_deszczu_3h
+  pogoda: !input pogoda
+  kuweta_licznik: !input kuweta_licznik
+  kuweta_prog: !input kuweta_prog
+  kuweta_obszar: !input kuweta_obszar
+  potrzeba: !input potrzeba
+  prog_potrzeby: !input prog_potrzeby
+  tryb_obecnosci: !input tryb_obecnosci
+  obecnosc: !input obecnosc
+  pomin_nieznane: !input pomin_nieznane
+  opoznienie_min: !input opoznienie_min
+  pusty_dom_dni: !input pusty_dom_dni
+  pusty_dom_od: !input pusty_dom_od
+  pusty_dom_do: !input pusty_dom_do
+  pusty_dom_procent: !input pusty_dom_procent
+  ogranicz_godziny: !input ogranicz_godziny
+  okno_od: !input okno_od
+  okno_do: !input okno_do
+  ogranicz_dni: !input ogranicz_dni
+  dni: !input dni
+  odstep_godz: !input odstep_godz
+  maks_przerwa_godz: !input maks_przerwa_godz
+  ponowienie_godz: !input ponowienie_godz
+  cisza_nocna: !input cisza_nocna
+  blokady: !input blokady
+  min_czas_sprzatania_min: !input min_czas_sprzatania_min
+  potwierdzenie_w_stacji_min: !input potwierdzenie_w_stacji_min
+  min_powierzchnia_procent: !input min_powierzchnia_procent
+  max_czas_godz: !input max_czas_godz
+  utknal_godz: !input utknal_godz
+  wznowienia_max: !input wznowienia_max
+  pauza_alarm_min: !input pauza_alarm_min
+  przypomnienie_godz: !input przypomnienie_godz
+  powiadom_o_starcie: !input powiadom_o_starcie
+  nazwa: "{{ state_attr(robot, 'friendly_name') or robot }}"
+  teraz: "{{ now().timestamp() | int }}"
+  st: "{{ states(robot) }}"
+  od_zmiany: "{{ ((now() - states[robot].last_changed).total_seconds()) | int if states[robot] is not none else 0 }}"
+  noc: "{{ cisza_nocna != '' and is_state(cisza_nocna, 'on') }}"
+  funkcje: "{{ state_attr(robot, 'supported_features') | int(0) }}"
+  ma_obszary: "{{ (funkcje | bitwise_and(16384)) > 0 }}"
+  ma_pauze: "{{ (funkcje | bitwise_and(4)) > 0 }}"
+  stany_stacji: "{{ ['docked', 'idle'] if start_takze_z_idle else ['docked'] }}"
+  kod_bledu: >-
+    {%- set ns = namespace(k='') -%}
+    {%- if sensor_bledu != '' -%}
+      {%- set v = states(sensor_bledu) | string -%}
+      {%- if v | lower not in ['ok', '0', 'none', 'brak', 'unknown', 'unavailable', ''] -%}{%- set ns.k = v -%}{%- endif -%}
+    {%- endif -%}
+    {%- if sensor_bledu == '' and state_attr(robot, 'fault_code_description') not in [none, '', 0, '0'] and (state_attr(robot, 'fault_code') | string) not in ['0', ''] -%}
+      {%- set ns.k = state_attr(robot, 'fault_code_description') | string -%}
+    {%- endif -%}
+    {{ ns.k[:120] }}
+  stacja_problem: >-
+    {{ sensor_alarmow_stacji != ''
+       and (states(sensor_alarmow_stacji) | string | lower) not in ['ok', '0', 'none', 'brak', 'unknown', 'unavailable', ''] }}
+  ktos_w_domu: >-
+    {%- set ns = namespace(dom=false) -%}
+    {%- for e in obecnosc -%}
+      {%- set s = states[e] -%}
+      {%- set d = e.split('.')[0] -%}
+      {%- if s is none -%}
+        {%- if not pomin_nieznane -%}
+          {%- set ns.dom = true -%}
+        {%- endif -%}
+      {%- elif s.state in ['unknown', 'unavailable'] -%}
+        {%- if not (pomin_nieznane and (now() - s.last_changed).total_seconds() > 86400) -%}
+          {%- set ns.dom = true -%}
+        {%- endif -%}
+      {%- elif d in ['person', 'device_tracker'] and s.state == 'home' -%}
+        {%- set ns.dom = true -%}
+      {%- elif d in ['binary_sensor', 'input_boolean'] and s.state == 'on' -%}
+        {%- set ns.dom = true -%}
+      {%- elif d == 'group' and s.state in ['home', 'on'] -%}
+        {%- set ns.dom = true -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ns.dom }}
+  minut_pustego_domu: >-
+    {%- set ns = namespace(ost=0) -%}
+    {%- for e in obecnosc -%}
+      {%- set s = states[e] -%}
+      {%- if s is not none and s.last_changed.timestamp() > ns.ost -%}
+        {%- set ns.ost = s.last_changed.timestamp() -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ((now().timestamp() - ns.ost) / 60) | round(0) | int if ns.ost > 0 else 0 }}
+  mokro: >-
+    {{ (deszcz_24h != '' and states(deszcz_24h) | float(0) >= 1)
+       or (prognoza_opad_3h != '' and states(prognoza_opad_3h) | float(0) >= 0.5)
+       or (prognoza_szansa_deszczu_3h != '' and states(prognoza_szansa_deszczu_3h) | float(0) >= 60)
+       or (pogoda != '' and states(pogoda) in ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy']) }}
+  brud: "{{ states(potrzeba) | float(0) if potrzeba != '' else states(pomocnik_brud) | float(0) }}"
+
+actions:
+  - alias: Licznik brudu - godzina i drzwi
+    if:
+      - condition: template
+        value_template: "{{ trigger.id in ['godzina', 'drzwi'] and potrzeba == '' }}"
+    then:
+      - variables:
+          dodaj: >-
+            {%- if trigger.id == 'godzina' -%}
+              {{ pkt_baza | float(0) + (pkt_obecnosc | float(0) if ktos_w_domu | bool and 7 <= now().hour < 22 else 0) }}
+            {%- else -%}
+              {{ pkt_drzwi | float(0) * (2 if mokro | bool else 1) }}
+            {%- endif -%}
+      - if:
+          - condition: template
+            value_template: "{{ dodaj | float(0) > 0 }}"
+        then:
+          - action: input_number.set_value
+            target:
+              entity_id: !input pomocnik_brud
+            data:
+              value: "{{ [states(pomocnik_brud) | float(0) + dodaj | float(0), state_attr(pomocnik_brud, 'max') | float(300)] | min }}"
+
+  - alias: Domownik wrócił podczas sprzątania
+    if:
+      - condition: template
+        value_template: >-
+          {%- set s = states(pomocnik_stan) -%}
+          {%- set S = s | from_json if s.startswith('{') else {} -%}
+          {{ trigger.id == 'obecnosc' and not tryb_podgladu and tryb_obecnosci == 'pusty_dom'
+             and reakcja_powrot != 'none' and ktos_w_domu | bool and st == 'cleaning'
+             and S.get('od', 0) | int > 0 and S.get('s', '') == 'a' }}
+    then:
+      - variables:
+          S: >-
+            {%- set s = states(pomocnik_stan) -%}
+            {{ s | from_json if s.startswith('{') else {} }}
+      - action: input_text.set_value
+        target:
+          entity_id: !input pomocnik_stan
+        data:
+          value: "{{ dict(S, s='p', e=teraz) | to_json }}"
+      - if:
+          - condition: template
+            value_template: "{{ reakcja_powrot == 'pause' and ma_pauze }}"
+        then:
+          - action: vacuum.pause
+            continue_on_error: true
+            target:
+              entity_id: !input robot
+          - action: input_text.set_value
+            target:
+              entity_id: !input pomocnik_powod
+            data:
+              value: "Ktoś wrócił - robot wstrzymany {{ now().strftime('%H:%M') }}"
+        else:
+          - action: vacuum.return_to_base
+            continue_on_error: true
+            target:
+              entity_id: !input robot
+          - action: input_text.set_value
+            target:
+              entity_id: !input pomocnik_powod
+            data:
+              value: "Ktoś wrócił - robot wraca do stacji, dokończy później ({{ now().strftime('%H:%M') }})"
+      - if:
+          - condition: template
+            value_template: "{{ powiadom_o_starcie }}"
+        then:
+          - variables:
+              tytul: "{{ nazwa }}: sprzątanie przerwane"
+              tresc: Ktoś wrócił do domu.
+              tag: "robot_{{ robot.split('.')[1] }}_info"
+              rodzaj: informacja
+          - sequence: !input akcje_powiadomien
+
+  - alias: Cykl - stan sprzątania, nadzór, problemy i start
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'cykl' }}"
+    then:
+      - alias: Kuweta - nowe użycia od ostatniego cyklu
+        if:
+          - condition: template
+            value_template: "{{ kuweta_licznik != '' and states(kuweta_licznik) | is_number }}"
+        then:
+          - variables:
+              S: >-
+                {%- set s = states(pomocnik_stan) -%}
+                {{ s | from_json if s.startswith('{') else {} }}
+              licznik: "{{ states(kuweta_licznik) | float(0) | int }}"
+              poprzedni: "{{ S.get('kl', -1) | int }}"
+              nowe: "{{ [[licznik - poprzedni, 0] | max, 5] | min if poprzedni >= 0 else 0 }}"
+          - if:
+              - condition: template
+                value_template: "{{ licznik != poprzedni }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_stan
+                data:
+                  value: "{{ dict(S, kl=licznik, k=S.get('k', 0) | int + nowe) | to_json }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ nowe > 0 and potrzeba == '' and pkt_kuweta | float(0) > 0 }}"
+                then:
+                  - action: input_number.set_value
+                    target:
+                      entity_id: !input pomocnik_brud
+                    data:
+                      value: "{{ [states(pomocnik_brud) | float(0) + nowe * pkt_kuweta | float(0), state_attr(pomocnik_brud, 'max') | float(300)] | min }}"
+
+      - alias: Sprzątanie rozpoczęte poza automatyzacją
+        if:
+          - condition: template
+            value_template: >-
+              {%- set s = states(pomocnik_stan) -%}
+              {%- set S = s | from_json if s.startswith('{') else {} -%}
+              {{ S.get('od', 0) | int == 0 and st == 'cleaning' and od_zmiany >= 120 }}
+        then:
+          - variables:
+              S: >-
+                {%- set s = states(pomocnik_stan) -%}
+                {{ s | from_json if s.startswith('{') else {} }}
+          - action: input_text.set_value
+            target:
+              entity_id: !input pomocnik_stan
+            data:
+              value: "{{ dict(S, od=teraz - od_zmiany, s='z', w=0) | to_json }}"
+
+      - alias: Nadzór sprzątania w toku
+        if:
+          - condition: template
+            value_template: >-
+              {%- set s = states(pomocnik_stan) -%}
+              {%- set S = s | from_json if s.startswith('{') else {} -%}
+              {{ S.get('od', 0) | int > 0 }}
+        then:
+          - variables:
+              S: >-
+                {%- set s = states(pomocnik_stan) -%}
+                {{ s | from_json if s.startswith('{') else {} }}
+              od: "{{ S.get('od', 0) | int }}"
+              zrodlo: "{{ S.get('s', 'a') }}"
+              czas_s: >-
+                {%- set ns = namespace(c=-1) -%}
+                {%- if sensor_czasu != '' and states(sensor_czasu) | is_number -%}
+                  {%- set j = state_attr(sensor_czasu, 'unit_of_measurement') | string -%}
+                  {%- set m = {'s': 1, 'min': 60, 'h': 3600, 'd': 86400}.get(j, 60) -%}
+                  {%- set ns.c = states(sensor_czasu) | float(0) * m -%}
+                {%- endif -%}
+                {{ ns.c | int if ns.c >= 0 else [teraz - od - od_zmiany, 0] | max }}
+              m2: "{{ states(sensor_powierzchni) | float(-1) if sensor_powierzchni != '' else -1 }}"
+              jedn: "{{ (state_attr(sensor_powierzchni, 'unit_of_measurement') if sensor_powierzchni != '' else '') or 'm²' }}"
+              mediana: >-
+                {%- set l = S.get('m', []) | sort -%}
+                {{ l[(l | length) // 2] if l | length >= 3 else -1 }}
+              pelne: >-
+                {{ czas_s | int >= min_czas_sprzatania_min | int * 60
+                   and (m2 | float < 0 or mediana | float < 0
+                        or m2 | float >= mediana | float * min_powierzchnia_procent | float / 100) }}
+              stan_wznowienie: "{{ S.get('wr', 0) | int }}"
+          - choose:
+              - alias: Koniec - robot w stacji wystarczająco długo
+                conditions:
+                  - condition: template
+                    value_template: "{{ st in stany_stacji and od_zmiany >= potwierdzenie_w_stacji_min | int * 60 }}"
+                sequence:
+                  - choose:
+                      - alias: Szybkie sprzątanie przy kuwecie zakończone
+                        conditions:
+                          - condition: template
+                            value_template: "{{ zrodlo == 'k' }}"
+                        sequence:
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_stan
+                            data:
+                              value: "{{ dict(S, od=0, k=0, s='', e=teraz) | to_json }}"
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_powod
+                            data:
+                              value: "Kuweta: obszar posprzątany ({{ now().strftime('%H:%M') }})"
+                      - alias: Pełne sprzątanie
+                        conditions:
+                          - condition: template
+                            value_template: "{{ pelne }}"
+                        sequence:
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_stan
+                            data:
+                              value: >-
+                                {%- set l = (S.get('m', []) + ([m2 | round(0) | int] if m2 | float > 0 else []))[-5:] -%}
+                                {{ dict(S, od=0, z=teraz, k=0, w=0, s='', m=l, e=teraz, pz=0) | to_json }}
+                          - if:
+                              - condition: template
+                                value_template: "{{ potrzeba == '' }}"
+                            then:
+                              - action: input_number.set_value
+                                target:
+                                  entity_id: !input pomocnik_brud
+                                data:
+                                  value: 0
+                          - action: input_datetime.set_datetime
+                            target:
+                              entity_id: !input pomocnik_nastepne
+                            data:
+                              timestamp: "{{ teraz + (odstep_godz | float(12) * 3600) | int }}"
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_powod
+                            data:
+                              value: >-
+                                Zakończono {{ now().strftime('%d.%m %H:%M') }} ({{ (czas_s | int / 60) | round(0) | int }} min{{ (', ' ~ (m2 | round(0) | int) ~ ' ' ~ jedn) if m2 | float > 0 else '' }})
+                          - sequence: !input akcje_po_sprzataniu
+                          - if:
+                              - condition: template
+                                value_template: "{{ powiadom_o_starcie }}"
+                            then:
+                              - variables:
+                                  tytul: "{{ nazwa }}: posprzątane"
+                                  tresc: >-
+                                    Sprzątanie zakończone po {{ (czas_s | int / 60) | round(0) | int }} min{{ (', ' ~ (m2 | round(0) | int) ~ ' ' ~ jedn) if m2 | float > 0 else '' }}.
+                                  tag: "robot_{{ robot.split('.')[1] }}_info"
+                                  rodzaj: informacja
+                              - sequence: !input akcje_powiadomien
+                      - alias: Sprzątanie spoza automatyzacji, niepełne - bez powiadomienia
+                        conditions:
+                          - condition: template
+                            value_template: "{{ zrodlo == 'z' }}"
+                        sequence:
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_stan
+                            data:
+                              value: "{{ dict(S, od=0, w=0, s='', pz=0) | to_json }}"
+                    default:
+                      - alias: Przerwane - ponowienie później
+                        action: input_text.set_value
+                        target:
+                          entity_id: !input pomocnik_stan
+                        data:
+                          value: "{{ dict(S, od=0, w=0, s='', e=teraz, pz=0) | to_json }}"
+                      - action: input_datetime.set_datetime
+                        target:
+                          entity_id: !input pomocnik_nastepne
+                        data:
+                          timestamp: "{{ teraz + (ponowienie_godz | float(3) * 3600) | int }}"
+                      - action: input_text.set_value
+                        target:
+                          entity_id: !input pomocnik_powod
+                        data:
+                          value: >-
+                            Przerwane {{ now().strftime('%d.%m %H:%M') }} ({{ (czas_s | int / 60) | round(0) | int }} min{{ (', ' ~ (m2 | round(0) | int) ~ ' ' ~ jedn) if m2 | float > 0 else '' }}) - ponowię za {{ ponowienie_godz }} h
+                      - if:
+                          - condition: template
+                            value_template: "{{ zrodlo == 'a' or powiadom_o_starcie }}"
+                        then:
+                          - variables:
+                              tytul: "{{ nazwa }}: sprzątanie przerwane"
+                              tresc: >-
+                                Robot wrócił do stacji, ale sprzątanie nie jest pełne ({{ (czas_s | int / 60) | round(0) | int }} min{{ (', ' ~ (m2 | round(0) | int) ~ ' ' ~ jedn) if m2 | float > 0 else '' }}). Ponowię za {{ ponowienie_godz }} h.
+                              tag: "robot_{{ robot.split('.')[1] }}_info"
+                              rodzaj: informacja
+                          - sequence: !input akcje_powiadomien
+
+              - alias: Limit czasu sprzątania od startu
+                conditions:
+                  - condition: template
+                    value_template: "{{ teraz - od > max_czas_godz | float(5) * 3600 and st not in stany_stacji }}"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ not tryb_podgladu }}"
+                    then:
+                      - action: vacuum.return_to_base
+                        continue_on_error: true
+                        target:
+                          entity_id: !input robot
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: "{{ dict(S, od=0, w=0, s='', e=teraz, pz=0) | to_json }}"
+                  - action: input_datetime.set_datetime
+                    target:
+                      entity_id: !input pomocnik_nastepne
+                    data:
+                      timestamp: "{{ teraz + (ponowienie_godz | float(3) * 3600) | int }}"
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "Przerwane - limit {{ max_czas_godz }} h, robot wraca do stacji (stan: {{ st }})"
+                  - variables:
+                      tytul: "{{ nazwa }} wymaga uwagi"
+                      tresc: >-
+                        Robot nie skończył sprzątania w {{ max_czas_godz }} h (stan: {{ st }}{{ (', błąd: ' ~ kod_bledu) if kod_bledu != '' else '' }}). Wysłałem go do stacji, ponowię za {{ ponowienie_godz }} h.
+                      tag: "robot_{{ robot.split('.')[1] }}_info"
+                      rodzaj: informacja
+                  - sequence: !input akcje_powiadomien
+
+              - alias: Pauza bez kodu błędu - wznowienie
+                conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ zrodlo == 'a' and not tryb_podgladu and st == 'paused'
+                         and od_zmiany >= pauza_alarm_min | int * 60
+                         and kod_bledu == '' and not stacja_problem | bool and not noc | bool
+                         and S.get('w', 0) | int < wznowienia_max | int
+                         and teraz - stan_wznowienie >= 3000 and 8 <= now().hour < 21 }}
+                sequence:
+                  - action: vacuum.start
+                    continue_on_error: true
+                    target:
+                      entity_id: !input robot
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: "{{ dict(S, w=S.get('w', 0) | int + 1, wr=teraz) | to_json }}"
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "Wznowiono po pauzie (próba {{ S.get('w', 0) | int + 1 }}) {{ now().strftime('%H:%M') }}"
+
+              - alias: Robot znowu sprząta po pauzie
+                conditions:
+                  - condition: template
+                    value_template: "{{ st == 'cleaning' and S.get('pz', 0) | int == 1 }}"
+                sequence:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: "{{ dict(S, pz=0) | to_json }}"
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "Sprząta (wznowione) od {{ now().strftime('%H:%M') }}"
+
+              - alias: Pauza - zapisz powód
+                conditions:
+                  - condition: template
+                    value_template: "{{ st == 'paused' and od_zmiany >= pauza_alarm_min | int * 60 }}"
+                sequence:
+                  - variables:
+                      nowy_powod: >-
+                        Pauza{{ (': ' ~ kod_bledu) if kod_bledu != '' else (': problem stacji' if stacja_problem | bool else ' bez kodu błędu') }}
+                  - if:
+                      - condition: template
+                        value_template: "{{ states(pomocnik_powod) != nowy_powod }}"
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: !input pomocnik_stan
+                        data:
+                          value: "{{ dict(S, pz=1) | to_json }}"
+                      - action: input_text.set_value
+                        target:
+                          entity_id: !input pomocnik_powod
+                        data:
+                          value: "{{ nowy_powod[:250] }}"
+
+      - alias: Zadanie spoza automatyzacji - długa pauza z błędem, powrót do stacji
+        if:
+          - condition: template
+            value_template: >-
+              {%- set s = states(pomocnik_stan) -%}
+              {%- set S = s | from_json if s.startswith('{') else {} -%}
+              {{ not tryb_podgladu and S.get('od', 0) | int == 0 and st == 'paused'
+                 and kod_bledu != '' and od_zmiany >= 10800 }}
+        then:
+          - action: vacuum.return_to_base
+            continue_on_error: true
+            target:
+              entity_id: !input robot
+
+      - alias: Problemy - nowy problem, przypomnienia i koniec problemu
+        sequence:
+          - variables:
+              S: >-
+                {%- set s = states(pomocnik_stan) -%}
+                {{ s | from_json if s.startswith('{') else {} }}
+              typ: >-
+                {%- if st == 'unavailable' and od_zmiany >= 300 -%}niedostepny
+                {%- elif st == 'error' -%}blad
+                {%- elif st not in stany_stacji and stacja_problem | bool -%}stacja
+                {%- elif st == 'paused' and od_zmiany >= pauza_alarm_min | int * 60
+                     and (kod_bledu != '' or stacja_problem | bool
+                          or (S.get('od', 0) | int > 0
+                              and (S.get('s', '') != 'a' or tryb_podgladu or noc | bool
+                                   or S.get('w', 0) | int >= wznowienia_max | int
+                                   or not (8 <= now().hour < 21)))) -%}pauza
+                {%- elif st in ['returning'] + ([] if start_takze_z_idle else ['idle']) and od_zmiany >= utknal_godz | float(2) * 3600 -%}utknal
+                {%- elif st == 'cleaning' and od_zmiany >= utknal_godz | float(2) * 3600 and sensor_powierzchni != '' and states[sensor_powierzchni] is not none
+                     and (now() - states[sensor_powierzchni].last_changed).total_seconds() >= utknal_godz | float(2) * 3600 -%}utknal
+                {%- endif -%}
+              opis: >-
+                {%- if typ == 'niedostepny' -%}Brak łączności z robotem od {{ (od_zmiany / 60) | int }} min. Sprawdź zasilanie stacji i Wi-Fi.
+                {%- elif typ == 'blad' -%}Robot zgłosił błąd{{ (': ' ~ kod_bledu) if kod_bledu != '' else '' }}. Sprawdź robota i stację.
+                {%- elif typ == 'stacja' -%}Problem stacji: {{ states(sensor_alarmow_stacji) }}.
+                {%- elif typ == 'pauza' -%}Robot stoi w pauzie od {{ (od_zmiany / 60) | int }} min{{ (' (' ~ kod_bledu ~ ')') if kod_bledu != '' else '' }}.
+                {%- elif typ == 'utknal' -%}Robot utknął: od {{ (od_zmiany / 3600) | round(1) }} h bez zmian (stan: {{ st }}).
+                {%- endif -%}
+              tag: "robot_{{ robot.split('.')[1] }}_problem"
+              problem_teraz: "{{ S.get('pt', '') }}"
+              ok_od_5_min: "{{ typ == '' and st not in ['unavailable', 'unknown', 'error'] and od_zmiany >= 300 }}"
+          - choose:
+              - alias: Nowy problem - od razu powiadomienie
+                conditions:
+                  - condition: template
+                    value_template: "{{ typ != '' and problem_teraz == '' }}"
+                sequence:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: "{{ dict(S, pt=typ, po=teraz, pn=teraz) | to_json }}"
+                  - variables:
+                      tytul: "{{ nazwa }} wymaga uwagi"
+                      tresc: "{{ opis }}"
+                      rodzaj: problem
+                  - sequence: !input akcje_powiadomien
+              - alias: Problem trwa - przypomnienie
+                conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ typ != '' and problem_teraz != '' and not noc | bool
+                         and teraz - S.get('pn', 0) | int >= przypomnienie_godz | float(6) * 3600 }}
+                sequence:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: "{{ dict(S, pt=typ, pn=teraz) | to_json }}"
+                  - variables:
+                      tytul: "Przypomnienie: {{ nazwa }}"
+                      tresc: >-
+                        Problem trwa od {{ S.get('po', teraz) | int | timestamp_custom('%d.%m %H:%M') }}. {{ opis }}
+                      rodzaj: przypomnienie
+                  - sequence: !input akcje_powiadomien
+              - alias: Problem usunięty
+                conditions:
+                  - condition: template
+                    value_template: "{{ problem_teraz != '' and ok_od_5_min | bool }}"
+                sequence:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: "{{ dict(S, pt='', po=0, pn=0) | to_json }}"
+                  - variables:
+                      tytul: "{{ nazwa }}: problem usunięty"
+                      tresc: Robot działa normalnie.
+                      rodzaj: rozwiazany
+                  - sequence: !input akcje_powiadomien
+
+      - alias: Start - decyzja i wykonanie
+        sequence:
+          - variables:
+              S: >-
+                {%- set s = states(pomocnik_stan) -%}
+                {{ s | from_json if s.startswith('{') else {} }}
+              nastepne: "{{ state_attr(pomocnik_nastepne, 'timestamp') | float(0) }}"
+              ostatnie_pelne: "{{ S.get('z', 0) | int }}"
+              dzien: "{{ ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][now().weekday()] }}"
+              w_oknie_zwyklym: >-
+                {%- set od = today_at(okno_od) -%}
+                {%- set do = today_at(okno_do) -%}
+                {%- set w = (od <= now() < do) if od <= do else (now() >= od or now() < do) -%}
+                {{ (not ogranicz_godziny or w) and (not ogranicz_dni or dzien in dni) }}
+              w_oknie_pustego_domu: >-
+                {{ tryb_obecnosci == 'pusty_dom' and dzien in pusty_dom_dni
+                   and today_at(pusty_dom_od) <= now() < today_at(pusty_dom_do) }}
+              dom_pusty: >-
+                {{ obecnosc | length > 0 and not ktos_w_domu | bool and minut_pustego_domu | int >= opoznienie_min | int }}
+              przerwa_przekroczona: "{{ ostatnie_pelne == 0 or teraz - ostatnie_pelne >= maks_przerwa_godz | float(48) * 3600 }}"
+              blokada_wlaczona: >-
+                {%- set ns = namespace(b=false) -%}
+                {%- for e in blokady -%}{%- if is_state(e, 'on') -%}{%- set ns.b = true -%}{%- endif -%}{%- endfor -%}
+                {{ ns.b }}
+              regula: >-
+                {%- if w_oknie_pustego_domu | bool and dom_pusty | bool and brud | float >= prog_potrzeby | float * pusty_dom_procent | float / 100 -%}pusty
+                {%- elif w_oknie_zwyklym | bool and brud | float >= prog_potrzeby | float -%}brud
+                {%- elif (w_oknie_zwyklym | bool or (w_oknie_pustego_domu | bool and dom_pusty | bool)) and przerwa_przekroczona | bool -%}przerwa
+                {%- endif -%}
+              powod_blokady: >-
+                {%- if noc | bool -%}
+                  cisza nocna
+                {%- elif S.get('od', 0) | int > 0 -%}
+                  trwa sprzątanie
+                {%- elif not wlasny_start and obszary | length > 0 and not ma_obszary | bool -%}
+                  robot nie obsługuje sprzątania obszarów
+                {%- elif st not in stany_stacji -%}
+                  robot nie stoi w stacji (stan: {{ st }})
+                {%- elif nastepne > teraz -%}
+                  najbliższy start od {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+                {%- elif bateria != '' and states(bateria) | float(-1) < 0 -%}
+                  brak odczytu baterii
+                {%- elif bateria != '' and states(bateria) | float(0) < min_bateria | float(0) -%}
+                  bateria {{ states(bateria) }}%, minimum {{ min_bateria | int }}%
+                {%- elif blokada_wlaczona | bool -%}
+                  włączona blokada sprzątania
+                {%- elif regula == '' -%}
+                  brud {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}{{ ', pusty dom od ' ~ (pusty_dom_od[:5]) if tryb_obecnosci == 'pusty_dom' else '' }}
+                {%- endif -%}
+              nazwa_reguly: >-
+                {%- if regula == 'pusty' -%}pusty dom{%- elif regula == 'brud' -%}próg brudu{%- else -%}maksymalna przerwa{%- endif -%}
+          - choose:
+              - alias: Czekam - zapisz powód
+                conditions:
+                  - condition: template
+                    value_template: "{{ powod_blokady | trim != '' }}"
+                sequence:
+                  - variables:
+                      nowy_powod: "Czekam: {{ powod_blokady | trim }}"
+                  - if:
+                      - condition: template
+                        value_template: >-
+                          {{ states(pomocnik_powod) != nowy_powod
+                             and S.get('od', 0) | int == 0
+                             and teraz - S.get('e', 0) | int >= 3600 }}
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: !input pomocnik_powod
+                        data:
+                          value: "{{ nowy_powod[:250] }}"
+              - alias: Podgląd - zapisz, co bym zrobił
+                conditions:
+                  - condition: template
+                    value_template: "{{ tryb_podgladu }}"
+                sequence:
+                  - variables:
+                      nowy_powod: "Podgląd: wystartowałbym teraz ({{ nazwa_reguly }}, brud {{ brud | round(0) | int }}/{{ prog_potrzeby | int }})"
+                  - if:
+                      - condition: template
+                        value_template: "{{ states(pomocnik_powod) != nowy_powod }}"
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: !input pomocnik_powod
+                        data:
+                          value: "{{ nowy_powod[:250] }}"
+            default:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_stan
+                data:
+                  value: "{{ dict(S, od=teraz, s='a', w=0, wr=0, p=teraz, pz=0) | to_json }}"
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: !input pomocnik_nastepne
+                data:
+                  timestamp: "{{ teraz + (ponowienie_godz | float(3) * 3600) | int }}"
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Start ({{ nazwa_reguly }}) {{ now().strftime('%H:%M') }}"
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ wlasny_start }}"
+                    sequence: !input akcje_startu
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ obszary | length > 0 }}"
+                    sequence:
+                      - action: vacuum.clean_area
+                        continue_on_error: true
+                        target:
+                          entity_id: !input robot
+                        data:
+                          cleaning_area_id: !input obszary
+                default:
+                  - action: vacuum.start
+                    continue_on_error: true
+                    target:
+                      entity_id: !input robot
+              - wait_template: "{{ states(robot) in ['cleaning', 'returning', 'error', 'paused'] }}"
+                timeout:
+                  minutes: 5
+                continue_on_timeout: true
+              - variables:
+                  ruszyl: "{{ states(robot) in ['cleaning', 'returning'] }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ ruszyl }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "Sprząta ({{ nazwa_reguly }}) od {{ now().strftime('%H:%M') }}"
+                  - if:
+                      - condition: template
+                        value_template: "{{ powiadom_o_starcie }}"
+                    then:
+                      - variables:
+                          tytul: "{{ nazwa }}: sprzątanie rozpoczęte"
+                          tresc: "Powód: {{ nazwa_reguly }}, brud {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}."
+                          tag: "robot_{{ robot.split('.')[1] }}_info"
+                          rodzaj: informacja
+                      - sequence: !input akcje_powiadomien
+                else:
+                  - variables:
+                      kod: >-
+                        {%- set ns = namespace(k='') -%}
+                        {%- if sensor_bledu != '' and (states(sensor_bledu) | string | lower) not in ['ok', '0', 'none', 'brak', 'unknown', 'unavailable', ''] -%}
+                          {%- set ns.k = states(sensor_bledu) | string -%}
+                        {%- elif sensor_bledu == '' and (state_attr(robot, 'fault_code') | string) not in ['0', '', 'None'] -%}
+                          {%- set ns.k = state_attr(robot, 'fault_code_description') | string -%}
+                        {%- elif sensor_alarmow_stacji != '' and (states(sensor_alarmow_stacji) | string | lower) not in ['ok', '0', 'none', 'brak', 'unknown', 'unavailable', ''] -%}
+                          {%- set ns.k = states(sensor_alarmow_stacji) | string -%}
+                        {%- endif -%}
+                        {{ ns.k[:120] }}
+                      stan_po: "{{ states(robot) }}"
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: >-
+                        {%- set s = states(pomocnik_stan) -%}
+                        {%- set S2 = s | from_json if s.startswith('{') else {} -%}
+                        {{ dict(S2, od=0, s='', e=teraz) | to_json }}
+                  - if:
+                      - condition: template
+                        value_template: "{{ states(robot) not in stany_stacji }}"
+                    then:
+                      - action: vacuum.return_to_base
+                        continue_on_error: true
+                        target:
+                          entity_id: !input robot
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "Nie wystartował {{ now().strftime('%H:%M') }} (stan: {{ stan_po }}{{ (', ' ~ kod) if kod != '' else '' }})"
+                  - variables:
+                      tytul: "{{ nazwa }}: nie wystartował"
+                      tresc: >-
+                        Robot nie rozpoczął sprzątania (stan: {{ stan_po }}{{ (', ' ~ kod) if kod != '' else '' }}). Ponowię za {{ ponowienie_godz }} h.
+                      tag: "robot_{{ robot.split('.')[1] }}_info"
+                      rodzaj: informacja
+                  - sequence: !input akcje_powiadomien
+
+      - alias: Kuweta - szybkie sprzątanie obszaru
+        if:
+          - condition: template
+            value_template: >-
+              {%- set s = states(pomocnik_stan) -%}
+              {%- set S = s | from_json if s.startswith('{') else {} -%}
+              {{ kuweta_licznik != '' and kuweta_obszar | length > 0 and ma_obszary | bool
+                 and S.get('k', 0) | int >= kuweta_prog | int and S.get('od', 0) | int == 0
+                 and not noc | bool and 9 <= now().hour < 21
+                 and st in stany_stacji and od_zmiany >= 180
+                 and (bateria == '' or states(bateria) | float(0) >= min_bateria | float(0))
+                 and teraz - S.get('kf', 0) | int >= 3600 }}
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ tryb_podgladu }}"
+            then:
+              - variables:
+                  nowy_powod: "Podgląd: kuweta - posprzątałbym obszar teraz"
+              - if:
+                  - condition: template
+                    value_template: "{{ states(pomocnik_powod) != nowy_powod }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "{{ nowy_powod }}"
+            else:
+              - variables:
+                  S: >-
+                    {%- set s = states(pomocnik_stan) -%}
+                    {{ s | from_json if s.startswith('{') else {} }}
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_stan
+                data:
+                  value: "{{ dict(S, od=teraz, s='k', kf=teraz) | to_json }}"
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Kuweta: sprząta obszar od {{ now().strftime('%H:%M') }}"
+              - action: vacuum.clean_area
+                continue_on_error: true
+                target:
+                  entity_id: !input robot
+                data:
+                  cleaning_area_id: !input kuweta_obszar
+              - wait_template: "{{ states(robot) in ['cleaning', 'returning', 'error', 'paused'] }}"
+                timeout:
+                  minutes: 3
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: "{{ states(robot) not in ['cleaning', 'returning'] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_stan
+                    data:
+                      value: >-
+                        {%- set s = states(pomocnik_stan) -%}
+                        {%- set S2 = s | from_json if s.startswith('{') else {} -%}
+                        {{ dict(S2, od=0, s='', e=teraz) | to_json }}
+                  - action: input_text.set_value
+                    target:
+                      entity_id: !input pomocnik_powod
+                    data:
+                      value: "Kuweta: robot nie wystartował {{ now().strftime('%H:%M') }} (stan: {{ states(robot) }})"

@@ -1,5 +1,10 @@
 # Zmiany
 
+## 2026-10-17
+
+- Nowa pozycja **Inteligentny robot sprzątający – każda marka** 1.0.0 (`roboty_inteligentne.yaml`, wersje `_en` i `_de`). Robot sprząta według licznika brudu (czas, obecność domowników, otwieranie drzwi z uwzględnieniem deszczu, kuweta), a nie według sztywnego harmonogramu. Trzy reguły startu: pusty dom przy niższym progu, zwykłe okno przy pełnym progu, maksymalna przerwa. Nigdy w ciszy nocnej, przy niskiej baterii ani częściej niż ustawiony odstęp. Pełne sprzątanie liczone po powrocie do stacji (czas od startu i typowa powierzchnia), wznawianie pauz bez kodu błędu, limit czasu od startu, „nie wystartował”, rozpoznanie sprzątania uruchomionego ręcznie, szybkie sprzątanie obszaru przy kuwecie, powiadomienia o problemach z przypomnieniami. Każda decyzja ma powód zapisany w pomocniku. Tryb podglądu bez komend do robota. Dotychczasowy blueprint **Robot sprzątający pod nieobecność** zostaje bez zmian.
+- Generator tłumaczeń: nowy blueprint w `PAIRS`, klucz `nowy_powod` traktowany jako tekst.
+
 ## 2026-10-11 (3)
 
 - **Automatyczne koszenie – każda kosiarka** i **Robot sprzątający pod nieobecność – każda marka**: wersje angielska i niemiecka (`koszenie_en.yaml`, `koszenie_de.yaml`, `roboty_sprzatajace_en.yaml`, `roboty_sprzatajace_de.yaml`). Każda ma własny adres źródła, więc „Importuj ponownie” pobiera tę samą wersję językową. Działanie bez zmian, tłumaczone są tylko teksty w formularzu, powiadomienia, powody w śladzie i komentarze.
