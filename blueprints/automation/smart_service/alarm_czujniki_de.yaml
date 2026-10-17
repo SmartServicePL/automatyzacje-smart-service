@@ -264,7 +264,7 @@ triggers:
     id: start
 
 variables:
-  # Texte der Benachrichtigungen und Gründe. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} und {procent} werden ersetzt.
+  # Texte der Benachrichtigungen und Gründe, freigegeben am 17.10.2026. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} und {procent} werden ersetzt.
   teksty:
     kanal: "Notfälle"
     przycisk_przyjalem: "BESTÄTIGEN"
@@ -273,32 +273,29 @@ variables:
     czujnik_centrali: "der Zentrale"
     ktos: "ein Haushaltsmitglied"
     wlamanie_tytul: "Alarm: Einbruch"
-    wlamanie_tresc: "Sensor {czujnik} hat um {godzina} den Alarm ausgelöst.\nWas tun: Prüfen Sie das Haus oder die Kameras. Bei einem Fehlalarm schalten Sie den Alarm unscharf."
-    wlamanie_cichy_tresc: "Sensor {czujnik} hat um {godzina} einen stillen Alarm ausgelöst. Die Sirenen sind aus.\nWas tun: Prüfen Sie das Haus oder die Kameras. Bei einem Fehlalarm schalten Sie den Alarm unscharf."
+    wlamanie_tresc: "Sensor {czujnik} hat um {godzina} den Alarm ausgelöst.\nWas tun: Prüfen Sie das Haus oder die Kameras. Wenn es ein Irrtum ist, schalten Sie den Alarm unscharf."
+    wlamanie_cichy_tresc: "Sensor {czujnik} hat um {godzina} einen stillen Alarm ausgelöst. Die Sirenen sind aus.\nWas tun: Prüfen Sie das Haus oder die Kameras. Wenn es ein Irrtum ist, schalten Sie den Alarm unscharf."
     zagrozenie_smoke: "Alarm: Rauch"
+    zagrozenie_tresc_smoke: "Sensor {czujnik} hat um {godzina} Rauch erkannt.\nWas tun: Verlassen Sie das Haus. Wenn Sie Rauch oder Feuer sehen, rufen Sie 112 an."
     zagrozenie_carbon_monoxide: "Alarm: Kohlenmonoxid"
+    zagrozenie_tresc_carbon_monoxide: "Sensor {czujnik} hat um {godzina} Kohlenmonoxid erkannt.\nWas tun: Öffnen Sie die Fenster, gehen Sie nach draußen und rufen Sie 112 an."
     zagrozenie_gas: "Alarm: Gas"
+    zagrozenie_tresc_gas: "Sensor {czujnik} hat um {godzina} Gas erkannt.\nWas tun: Benutzen Sie kein Feuer und keine Schalter, öffnen Sie die Fenster, verlassen Sie das Haus und rufen Sie 992 an."
     zagrozenie_moisture: "Alarm: Wasseraustritt"
-    zagrozenie_inne: "Alarm: Gefahr"
-    zagrozenie_tresc: "Sensor {czujnik} hat um {godzina} eine Gefahr erkannt."
-    co_zrobic_smoke: "Was tun: Verlassen Sie das Haus. Wenn Sie Rauch oder Feuer sehen, rufen Sie 112 an."
-    co_zrobic_carbon_monoxide: "Was tun: Öffnen Sie die Fenster, gehen Sie nach draußen und rufen Sie 112 an."
-    co_zrobic_gas: "Was tun: Kein offenes Feuer und keine Schalter, öffnen Sie die Fenster, verlassen Sie das Haus und rufen Sie den Gas-Notdienst an."
-    co_zrobic_moisture: "Was tun: Schließen Sie den Hauptwasserhahn und prüfen Sie die Stelle am Sensor."
-    co_zrobic_inne: "Was tun: Prüfen Sie die Stelle am Sensor."
+    zagrozenie_tresc_moisture: "Sensor {czujnik} hat um {godzina} Wasser erkannt.\nWas tun: Schließen Sie das Hauptwasserventil und prüfen Sie die Stelle am Sensor."
     przyjete_tytul: "Alarm bestätigt"
-    przyjete_tresc: "Bestätigung: {imie} um {godzina}.\nWas tun: nichts, jemand kümmert sich bereits darum."
+    przyjete_tresc: "Bestätigung: {imie} um {godzina}.\nWas tun: Nichts, jemand kümmert sich bereits darum."
     noc_odmowa_tytul: "Alarm nicht für die Nacht scharfgeschaltet"
     noc_odmowa_tresc: "{powod}.\nWas tun: Beheben Sie das und schalten Sie den Alarm von Hand scharf."
-    rano_odmowa_tytul: "Alarm noch für die Nacht scharf"
+    rano_odmowa_tytul: "Alarm noch scharf"
     rano_odmowa_tresc: "Die Zentrale hat das Unscharfschalten nach der Nacht nicht angenommen.\nWas tun: Schalten Sie den Alarm mit Code unscharf, bevor Sie die Tür öffnen."
-    rano_alarm_tresc: "Keine Unscharfschaltung: In der Nacht gab es einen Alarm.\nWas tun: Prüfen Sie, was ihn ausgelöst hat, und schalten Sie den Alarm von Hand unscharf."
-    rano_restart_tresc: "Keine Unscharfschaltung: Home Assistant wurde in der Nacht neu gestartet.\nWas tun: Schalten Sie den Alarm von Hand unscharf, bevor Sie die Tür öffnen."
+    rano_alarm_tresc: "Der Alarm wurde nicht unscharf geschaltet, weil es in der Nacht einen Alarm gab.\nWas tun: Prüfen Sie, was ihn ausgelöst hat, und schalten Sie den Alarm von Hand unscharf."
+    rano_restart_tresc: "Der Alarm wurde nicht unscharf geschaltet, weil das System in der Nacht neu gestartet wurde.\nWas tun: Schalten Sie den Alarm von Hand unscharf, bevor Sie die Tür öffnen."
     wyszli_tytul: "Alle sind weg, Alarm nicht scharf"
     wyszli_tresc: "Niemand ist zu Hause und der Alarm ist unscharf.\nWas tun: Schalten Sie den Alarm mit der Schaltfläche unten scharf."
     wyszli_kod_tresc: "Niemand ist zu Hause und der Alarm ist unscharf.\nWas tun: Öffnen Sie den Alarm und schalten Sie ihn mit Code scharf."
     uzbrojony_tytul: "Alarm scharf"
-    uzbrojony_tresc: "Scharfschaltung: {imie}, aus der Benachrichtigung um {godzina}.\nWas tun: nichts, der Alarm bewacht das Haus."
+    uzbrojony_tresc: "Scharfschaltung: {imie}, aus der Benachrichtigung um {godzina}.\nWas tun: Nichts, der Alarm bewacht das Haus."
     uzbroj_odmowa_tytul: "Alarm nicht scharfgeschaltet"
     uzbroj_odmowa_tresc: "{powod}.\nWas tun: Beheben Sie das und schalten Sie den Alarm erneut scharf."
     czujniki_tytul: "Alarmsensor funktioniert nicht"
@@ -318,11 +315,11 @@ variables:
     p_noc_uzbrojony: "Für die Nacht scharfgeschaltet um {godzina}"
     p_noc_juz_uzbrojony: "Keine Scharfschaltung für die Nacht: Der Alarm ist bereits scharf"
     p_noc_odmowa: "Nicht für die Nacht scharfgeschaltet: {powod}"
-    p_rano_rozbrojony: "Nach der Nacht unscharfgeschaltet um {godzina}"
-    p_rano_nie_ruszam: "Kein Unscharfschalten nach der Nacht: Die Scharfschaltung stammt nicht von dieser Automation"
-    p_rano_alarm: "Kein Unscharfschalten nach der Nacht: In der Nacht gab es einen Alarm"
-    p_rano_restart: "Kein Unscharfschalten nach der Nacht: Home Assistant wurde in der Nacht neu gestartet"
-    p_rano_odmowa: "Nach der Nacht nicht unscharfgeschaltet: Die Zentrale hat abgelehnt"
+    p_rano_rozbrojony: "Nach der Nacht unscharf geschaltet um {godzina}"
+    p_rano_nie_ruszam: "Nach der Nacht nicht unscharf geschaltet: Die Scharfschaltung stammt nicht von dieser Automation"
+    p_rano_odmowa: "Nach der Nacht nicht unscharf geschaltet: Die Zentrale hat abgelehnt"
+    p_rano_alarm: "Nach der Nacht nicht unscharf geschaltet: In der Nacht gab es einen Alarm"
+    p_rano_restart: "Nach der Nacht nicht unscharf geschaltet: Das System wurde in der Nacht neu gestartet"
     p_wyszli: "Erinnerung: Alle sind um {godzina} gegangen, Alarm unscharf"
     p_uzbrojony: "Scharfschaltung aus der Benachrichtigung: {imie} um {godzina}"
     p_uzbroj_odmowa: "Aus der Benachrichtigung nicht scharfgeschaltet: {powod}"
@@ -581,11 +578,9 @@ actions:
           nazwa: "{{ trigger.to_state.name if trigger.to_state is not none else czujnik }}"
           klasa: >-
             {%- set k = state_attr(czujnik, 'device_class') -%}
-            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'inne' }}
+            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'smoke' }}
           tytul: "{{ teksty['zagrozenie_' ~ klasa] }}"
-          tresc: |-
-            {{ teksty.zagrozenie_tresc | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}
-            {{ teksty['co_zrobic_' ~ klasa] }}
+          tresc: "{{ teksty['zagrozenie_tresc_' ~ klasa] | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}"
           dane:
             tag: "alarm_{{ obj }}_zagrozenie_{{ czujnik.split('.')[1] }}"
             channel: "{{ teksty.kanal }}"
@@ -834,7 +829,7 @@ actions:
       - variables:
           po_restarcie: "{{ trigger.id == 'start' }}"
           nowy_powod: ""
-      - alias: Auf das Ende der Nachtruhe oder eine Zustandsänderung der Zentrale warten
+      - alias: Warten auf das Ende der Nachtruhe oder eine Zustandsänderung der Zentrale
         wait_template: "{{ is_state(cisza_nocna, 'off') or states(alarm) not in ['arming', 'armed_night'] }}"
         timeout:
           hours: 20
@@ -845,7 +840,7 @@ actions:
           - condition: template
             value_template: "{{ noc_alarm }}"
         then:
-          - alias: In der Nacht gab es einen Alarm - bis zum Morgen warten
+          - alias: In der Nacht gab es einen Alarm - Warten bis zum Morgen
             wait_template: "{{ is_state(cisza_nocna, 'off') }}"
             timeout:
               hours: 20
@@ -1094,7 +1089,7 @@ actions:
       - condition: template
         value_template: "{{ trigger.id == 'niedostepny' }}"
     then:
-      - alias: Während der Nachtruhe bis zum Morgen warten
+      - alias: Während der Nachtruhe Warten bis zum Morgen
         wait_template: "{{ cisza_nocna == '' or not is_state(cisza_nocna, 'on') }}"
         timeout:
           hours: 14

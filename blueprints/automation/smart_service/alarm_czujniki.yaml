@@ -161,7 +161,7 @@ blueprint:
       input:
         pomocnik_powod:
           name: Pomocnik - powód ostatniej decyzji (opcjonalnie)
-          description: Pomocnik Tekst o długości maks. 255 znaków, np. "Nie uzbroiłem na noc - Zamknij - Okno salon".
+          description: Pomocnik Tekst o długości maks. 255 znaków, np. "Nieuzbrojony na noc - Zamknij - Okno salon".
           default: ""
           selector:
             entity:
@@ -264,7 +264,7 @@ triggers:
     id: start
 
 variables:
-  # Teksty powiadomień i powodów. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} i {procent} są podmieniane.
+  # Teksty powiadomień i powodów zatwierdzone 17.10.2026. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} i {procent} są podmieniane.
   teksty:
     kanal: "awarie"
     przycisk_przyjalem: "PRZYJĄŁEM"
@@ -273,36 +273,33 @@ variables:
     czujnik_centrali: "centrali"
     ktos: "ktoś z domowników"
     wlamanie_tytul: "Alarm: włamanie"
-    wlamanie_tresc: "Czujnik {czujnik} wyzwolił alarm o {godzina}.\nCo zrobić: sprawdź dom lub kamery. Jeśli to pomyłka, rozbrój alarm."
-    wlamanie_cichy_tresc: "Czujnik {czujnik} wyzwolił cichy alarm o {godzina}. Syreny są wyłączone.\nCo zrobić: sprawdź dom lub kamery. Jeśli to pomyłka, rozbrój alarm."
+    wlamanie_tresc: "Czujnik {czujnik} wyzwolił alarm o {godzina}.\nCo zrobić: Sprawdź dom lub kamery. Jeśli to pomyłka, rozbrój alarm."
+    wlamanie_cichy_tresc: "Czujnik {czujnik} wyzwolił cichy alarm o {godzina}. Syreny są wyłączone.\nCo zrobić: Sprawdź dom lub kamery. Jeśli to pomyłka, rozbrój alarm."
     zagrozenie_smoke: "Alarm: dym"
+    zagrozenie_tresc_smoke: "Czujnik {czujnik} wykrył dym o {godzina}.\nCo zrobić: Wyjdź z domu. Gdy widzisz dym lub ogień, dzwoń pod 112."
     zagrozenie_carbon_monoxide: "Alarm: czad"
+    zagrozenie_tresc_carbon_monoxide: "Czujnik {czujnik} wykrył czad o {godzina}.\nCo zrobić: Otwórz okna, wyjdź na zewnątrz i dzwoń pod 112."
     zagrozenie_gas: "Alarm: gaz"
+    zagrozenie_tresc_gas: "Czujnik {czujnik} wykrył gaz o {godzina}.\nCo zrobić: Nie używaj ognia ani włączników, otwórz okna, wyjdź i dzwoń pod 992."
     zagrozenie_moisture: "Alarm: zalanie"
-    zagrozenie_inne: "Alarm: zagrożenie"
-    zagrozenie_tresc: "Czujnik {czujnik} wykrył zagrożenie o {godzina}."
-    co_zrobic_smoke: "Co zrobić: wyjdź z domu. Gdy widzisz dym lub ogień, dzwoń pod 112."
-    co_zrobic_carbon_monoxide: "Co zrobić: otwórz okna, wyjdź na zewnątrz i dzwoń pod 112."
-    co_zrobic_gas: "Co zrobić: nie używaj ognia ani włączników, otwórz okna, wyjdź i dzwoń pod 992."
-    co_zrobic_moisture: "Co zrobić: zakręć główny zawór wody i sprawdź miejsce przy czujniku."
-    co_zrobic_inne: "Co zrobić: sprawdź miejsce przy czujniku."
+    zagrozenie_tresc_moisture: "Czujnik {czujnik} wykrył wodę o {godzina}.\nCo zrobić: Zakręć główny zawór wody i sprawdź miejsce przy czujniku."
     przyjete_tytul: "Alarm przyjęty"
-    przyjete_tresc: "Potwierdzenie: {imie} o {godzina}.\nCo zrobić: nic, ktoś już się tym zajmuje."
-    noc_odmowa_tytul: "Nie uzbroiłem alarmu na noc"
-    noc_odmowa_tresc: "{powod}.\nCo zrobić: popraw to i uzbrój alarm ręcznie."
-    rano_odmowa_tytul: "Alarm nadal uzbrojony na noc"
-    rano_odmowa_tresc: "Centrala nie przyjęła rozbrojenia po nocy.\nCo zrobić: rozbrój alarm kodem przed otwarciem drzwi."
-    rano_alarm_tresc: "Nie rozbrajam: w nocy był alarm.\nCo zrobić: sprawdź, co go wyzwoliło, i rozbrój alarm ręcznie."
-    rano_restart_tresc: "Nie rozbrajam: w nocy był restart Home Assistant.\nCo zrobić: rozbrój alarm ręcznie przed otwarciem drzwi."
+    przyjete_tresc: "Potwierdzenie: {imie} o {godzina}.\nCo zrobić: Nic, ktoś już się tym zajmuje."
+    noc_odmowa_tytul: "Alarm nieuzbrojony na noc"
+    noc_odmowa_tresc: "{powod}.\nCo zrobić: Popraw to i uzbrój alarm ręcznie."
+    rano_odmowa_tytul: "Alarm nadal uzbrojony"
+    rano_odmowa_tresc: "Centrala nie przyjęła rozbrojenia po nocy.\nCo zrobić: Rozbrój alarm kodem przed otwarciem drzwi."
+    rano_alarm_tresc: "Alarm nie został rozbrojony, bo w nocy był alarm.\nCo zrobić: Sprawdź, co go wyzwoliło, i rozbrój alarm ręcznie."
+    rano_restart_tresc: "Alarm nie został rozbrojony, bo w nocy był restart systemu.\nCo zrobić: Rozbrój alarm ręcznie przed otwarciem drzwi."
     wyszli_tytul: "Wszyscy wyszli, alarm nieuzbrojony"
-    wyszli_tresc: "Nikogo nie ma w domu, a alarm jest rozbrojony.\nCo zrobić: uzbrój alarm przyciskiem poniżej."
-    wyszli_kod_tresc: "Nikogo nie ma w domu, a alarm jest rozbrojony.\nCo zrobić: otwórz alarm i uzbrój go kodem."
+    wyszli_tresc: "Nikogo nie ma w domu, a alarm jest rozbrojony.\nCo zrobić: Uzbrój alarm przyciskiem poniżej."
+    wyszli_kod_tresc: "Nikogo nie ma w domu, a alarm jest rozbrojony.\nCo zrobić: Otwórz alarm i uzbrój go kodem."
     uzbrojony_tytul: "Alarm uzbrojony"
-    uzbrojony_tresc: "Uzbrojenie: {imie}, z powiadomienia o {godzina}.\nCo zrobić: nic, alarm pilnuje domu."
-    uzbroj_odmowa_tytul: "Nie uzbroiłem alarmu"
-    uzbroj_odmowa_tresc: "{powod}.\nCo zrobić: popraw to i uzbrój alarm ponownie."
+    uzbrojony_tresc: "Uzbrojenie: {imie}, z powiadomienia o {godzina}.\nCo zrobić: Nic, alarm pilnuje domu."
+    uzbroj_odmowa_tytul: "Alarm nieuzbrojony"
+    uzbroj_odmowa_tresc: "{powod}.\nCo zrobić: Popraw to i uzbrój alarm ponownie."
     czujniki_tytul: "Czujnik alarmu nie działa"
-    czujniki_tresc: "{lista}.\nCo zrobić: sprawdź zasilanie i zasięg czujnika albo wymień baterię."
+    czujniki_tresc: "{lista}.\nCo zrobić: Sprawdź zasilanie i zasięg czujnika albo wymień baterię."
     czujnik_niedostepny_teraz: "{czujnik}: brak łączności od ponad 30 min"
     czujnik_niedostepny: "{czujnik}: brak łączności od {godzin} h"
     czujnik_bateria: "{czujnik}: bateria {procent} %"
@@ -311,21 +308,21 @@ variables:
     powod_brak_odczytu: "Brak odczytu: {lista}"
     powod_centrala_odmowila: "Centrala odmówiła uzbrojenia (sprawdź jej ustawienia i czujniki)"
     powod_kod: "Centrala wymaga kodu, więc automatyzacja jej nie uzbraja"
-    p_wyzwolenie: "Wyzwoliłem alarm: {czujnik} o {godzina}"
+    p_wyzwolenie: "Wyzwolenie alarmu: {czujnik} o {godzina}"
     p_alarm: "Alarm: {czujnik} o {godzina}"
     p_zagrozenie: "Zagrożenie: {czujnik} o {godzina}"
     p_przyjete: "Potwierdzenie: {imie} o {godzina}"
-    p_noc_uzbrojony: "Uzbroiłem na noc o {godzina}"
-    p_noc_juz_uzbrojony: "Nie uzbrajam na noc: alarm już jest uzbrojony"
-    p_noc_odmowa: "Nie uzbroiłem na noc: {powod}"
-    p_rano_rozbrojony: "Rozbroiłem po nocy o {godzina}"
-    p_rano_nie_ruszam: "Nie rozbrajam po nocy: uzbrojenie nie pochodzi od tej automatyzacji"
-    p_rano_alarm: "Nie rozbrajam po nocy: w nocy był alarm"
-    p_rano_restart: "Nie rozbrajam po nocy: w nocy był restart Home Assistant"
-    p_rano_odmowa: "Nie rozbroiłem po nocy: centrala odmówiła"
+    p_noc_uzbrojony: "Uzbrojony na noc o {godzina}"
+    p_noc_juz_uzbrojony: "Bez uzbrojenia na noc: alarm już jest uzbrojony"
+    p_noc_odmowa: "Nieuzbrojony na noc: {powod}"
+    p_rano_rozbrojony: "Rozbrojony po nocy o {godzina}"
+    p_rano_nie_ruszam: "Nie rozbrojony po nocy: uzbrojenie nie pochodzi od tej automatyzacji"
+    p_rano_odmowa: "Nie rozbrojony po nocy: centrala odmówiła"
+    p_rano_alarm: "Nie rozbrojony po nocy: w nocy był alarm"
+    p_rano_restart: "Nie rozbrojony po nocy: w nocy był restart systemu"
     p_wyszli: "Przypomnienie: wszyscy wyszli o {godzina}, alarm rozbrojony"
     p_uzbrojony: "Uzbrojenie z powiadomienia: {imie} o {godzina}"
-    p_uzbroj_odmowa: "Nie uzbroiłem z powiadomienia: {powod}"
+    p_uzbroj_odmowa: "Nieuzbrojony z powiadomienia: {powod}"
   alarm: !input alarm
   czujniki_obwod: !input czujniki_obwod
   czujniki_ruch: !input czujniki_ruch
@@ -581,11 +578,9 @@ actions:
           nazwa: "{{ trigger.to_state.name if trigger.to_state is not none else czujnik }}"
           klasa: >-
             {%- set k = state_attr(czujnik, 'device_class') -%}
-            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'inne' }}
+            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'smoke' }}
           tytul: "{{ teksty['zagrozenie_' ~ klasa] }}"
-          tresc: |-
-            {{ teksty.zagrozenie_tresc | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}
-            {{ teksty['co_zrobic_' ~ klasa] }}
+          tresc: "{{ teksty['zagrozenie_tresc_' ~ klasa] | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}"
           dane:
             tag: "alarm_{{ obj }}_zagrozenie_{{ czujnik.split('.')[1] }}"
             channel: "{{ teksty.kanal }}"
@@ -756,14 +751,14 @@ actions:
         value_template: "{{ trigger.id == 'noc_start' and uzbrajaj_na_noc }}"
     then:
       - choose:
-          - alias: Alarm już uzbrojony albo w trakcie alarmu - nie ruszam
+          - alias: Alarm już uzbrojony albo w trakcie alarmu - bez zmian
             conditions:
               - condition: template
                 value_template: "{{ stan != 'disarmed' }}"
             sequence:
               - variables:
                   nowy_powod: "{{ teksty.p_noc_juz_uzbrojony }}"
-          - alias: Centrala wymaga kodu - nie uzbrajam
+          - alias: Centrala wymaga kodu - bez uzbrojenia
             conditions:
               - condition: template
                 value_template: "{{ kod_do_uzbrojenia | bool or (not smart_service and not bez_kodu | bool) }}"
@@ -834,7 +829,7 @@ actions:
       - variables:
           po_restarcie: "{{ trigger.id == 'start' }}"
           nowy_powod: ""
-      - alias: Czekam na koniec ciszy nocnej albo zmianę stanu centrali
+      - alias: Czekanie na koniec ciszy nocnej albo zmianę stanu centrali
         wait_template: "{{ is_state(cisza_nocna, 'off') or states(alarm) not in ['arming', 'armed_night'] }}"
         timeout:
           hours: 20
@@ -845,13 +840,13 @@ actions:
           - condition: template
             value_template: "{{ noc_alarm }}"
         then:
-          - alias: W nocy był alarm - czekam do rana
+          - alias: W nocy był alarm - czekanie do rana
             wait_template: "{{ is_state(cisza_nocna, 'off') }}"
             timeout:
               hours: 20
             continue_on_timeout: false
       - choose:
-          - alias: W nocy był alarm albo restart - nie rozbrajam
+          - alias: W nocy był alarm albo restart - bez rozbrojenia
             conditions:
               - condition: template
                 value_template: >-
@@ -871,7 +866,7 @@ actions:
                         message: "{{ tresc }}"
                         data:
                           tag: "{{ tag_noc }}"
-          - alias: Noc bez alarmu - rozbrajam
+          - alias: Noc bez alarmu - rozbrojenie
             conditions:
               - condition: template
                 value_template: "{{ not po_restarcie and is_state(cisza_nocna, 'off') and is_state(alarm, 'armed_night') }}"
@@ -920,7 +915,7 @@ actions:
         value_template: "{{ trigger.id == 'noc_koniec' and uzbrajaj_na_noc and smart_service and stan == 'armed_night' }}"
     then:
       - choose:
-          - alias: Uzbrojenie z automatyzacji bez alarmu - rozbrajam
+          - alias: Uzbrojenie z automatyzacji bez alarmu - rozbrojenie
             conditions:
               - condition: template
                 value_template: >-
@@ -954,7 +949,7 @@ actions:
                             message: "{{ teksty.rano_odmowa_tresc }}"
                             data:
                               tag: "{{ tag_noc }}"
-          - alias: Uzbrojenie z automatyzacji, ale w nocy był alarm - nie rozbrajam
+          - alias: Uzbrojenie z automatyzacji, ale w nocy był alarm - bez rozbrojenia
             conditions:
               - condition: template
                 value_template: >-
@@ -1094,7 +1089,7 @@ actions:
       - condition: template
         value_template: "{{ trigger.id == 'niedostepny' }}"
     then:
-      - alias: W ciszy nocnej czekam do rana
+      - alias: W ciszy nocnej czekanie do rana
         wait_template: "{{ cisza_nocna == '' or not is_state(cisza_nocna, 'on') }}"
         timeout:
           hours: 14

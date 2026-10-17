@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -154,15 +155,44 @@ class AlarmBlueprintTests(unittest.TestCase):
         self.assertNotIn("Uzbroił:", joined)
 
     def test_notification_texts_end_with_what_to_do(self) -> None:
+        kinds = ("smoke", "carbon_monoxide", "gas", "moisture")
         for suffix, prefix in WHAT_TO_DO.items():
             texts = load(suffix)["variables"]["teksty"]
             with self.subTest(language=suffix or "pl"):
-                for key, text in texts.items():
-                    if "\n" in text:
-                        self.assertTrue(text.split("\n")[-1].startswith(prefix), key)
-                for kind in ("smoke", "carbon_monoxide", "gas", "moisture", "inne"):
-                    self.assertTrue(texts[f"co_zrobic_{kind}"].startswith(prefix), kind)
+                bodies = [key for key in texts if "_tresc" in key]
+                self.assertEqual(len(bodies), 16)
+                for key in bodies:
+                    lines = texts[key].split("\n")
+                    self.assertEqual(len(lines), 2, key)
+                    self.assertTrue(lines[1].startswith(prefix + " "), key)
+                    self.assertTrue(lines[1][len(prefix) + 1].isupper(), key)
+                for kind in kinds:
                     self.assertIn(f"zagrozenie_{kind}", texts)
+                    self.assertIn(f"zagrozenie_tresc_{kind}", texts)
+                self.assertFalse([key for key in texts if key.endswith("_inne")])
+
+    def test_approved_texts(self) -> None:
+        """Samples of the texts approved on 17.10.2026 (A1-A16), word for word."""
+        texts = self.bp["variables"]["teksty"]
+        approved = {
+            "wlamanie_tytul": "Alarm: włamanie",
+            "zagrozenie_tresc_moisture": "Czujnik {czujnik} wykrył wodę o {godzina}.\nCo zrobić: Zakręć główny zawór wody i sprawdź miejsce przy czujniku.",
+            "noc_odmowa_tytul": "Alarm nieuzbrojony na noc",
+            "rano_odmowa_tytul": "Alarm nadal uzbrojony",
+            "rano_restart_tresc": "Alarm nie został rozbrojony, bo w nocy był restart systemu.\nCo zrobić: Rozbrój alarm ręcznie przed otwarciem drzwi.",
+            "uzbroj_odmowa_tytul": "Alarm nieuzbrojony",
+            "czujniki_tresc": "{lista}.\nCo zrobić: Sprawdź zasilanie i zasięg czujnika albo wymień baterię.",
+        }
+        for key, text in approved.items():
+            with self.subTest(key=key):
+                self.assertEqual(texts[key], text)
+
+    def test_no_first_person(self) -> None:
+        """Texts and step names are impersonal: no "uzbroiłem", "rozbrajam" and similar forms."""
+        text = SOURCE.read_text(encoding="utf-8").lower()
+        forms = r"\b(uzbroiłem|rozbroiłem|wyzwoliłem|uzbrajam|rozbrajam|czekam|ruszam|wysyłam|wyłączam|włączam)\b"
+        self.assertEqual(re.findall(forms, text), [])
+        self.assertNotIn("home assistant", " ".join(self.bp["variables"]["teksty"].values()).lower())
 
     def test_critical_notifications(self) -> None:
         found = [n for n in walk(self.bp["actions"]) if isinstance(n, dict) and "interruption-level" in n.get("push", {})]

@@ -4,9 +4,9 @@
 
 - **Alarm – czujniki i tryb nocny** 1.0.0, poprawki przed pierwszym wydaniem. Wejścia bez zmian.
   - Inna centrala niż Smart Service Alarm: automatyzacja pilnuje nocy od uzbrojenia do rana. Przejście centrali w oczekiwanie albo alarm w nocy, także z szybkim powrotem do uzbrojenia na noc, oraz restart Home Assistant w nocy oznaczają: rano bez rozbrojenia i powiadomienie. Zastępuje to regułę „uzbrojenie na noc najpóźniej 15 minut po początku ciszy”, która nie wykrywała krótkiego alarmu na początku nocy.
-  - Smart Service Alarm: uzbrojenie z automatyzacji, po którym w nocy był alarm, daje rano powiadomienie „Nie rozbrajam: w nocy był alarm”.
+  - Smart Service Alarm: uzbrojenie z automatyzacji, po którym w nocy był alarm, daje rano powiadomienie „Alarm nie został rozbrojony, bo w nocy był alarm.”.
   - Przegląd czujników o 9:00 nic nie wysyła, gdy trwa wtedy cisza nocna.
-  - Teksty bezosobowe: „Potwierdzenie: imię” i „Uzbrojenie: imię”.
+  - Teksty powiadomień w brzmieniu zatwierdzonym 17.10.2026 (A1–A16): bezosobowo, „Co zrobić” od wielkiej litery, treść zagrożenia według rodzaju (dym, czad, gaz, woda) bez rodzaju „inne”, „restart systemu”. Wpisy w pomocniku powodu i nazwy kroków też bezosobowo. EN i DE przetłumaczone na nowo.
 
 ## 2026-10-17 (3)
 

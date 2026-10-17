@@ -264,7 +264,7 @@ triggers:
     id: start
 
 variables:
-  # Texts of notifications and reasons. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} and {procent} are replaced.
+  # Texts of notifications and reasons approved on 17.10.2026. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} and {procent} are replaced.
   teksty:
     kanal: "emergencies"
     przycisk_przyjalem: "ACKNOWLEDGE"
@@ -273,36 +273,33 @@ variables:
     czujnik_centrali: "of the panel"
     ktos: "a household member"
     wlamanie_tytul: "Alarm: burglary"
-    wlamanie_tresc: "Sensor {czujnik} triggered the alarm at {godzina}.\nWhat to do: check the home or the cameras. If it is a mistake, disarm the alarm."
-    wlamanie_cichy_tresc: "Sensor {czujnik} triggered a silent alarm at {godzina}. The sirens are off.\nWhat to do: check the home or the cameras. If it is a mistake, disarm the alarm."
+    wlamanie_tresc: "Sensor {czujnik} triggered the alarm at {godzina}.\nWhat to do: Check the home or the cameras. If it is a mistake, disarm the alarm."
+    wlamanie_cichy_tresc: "Sensor {czujnik} triggered a silent alarm at {godzina}. The sirens are off.\nWhat to do: Check the home or the cameras. If it is a mistake, disarm the alarm."
     zagrozenie_smoke: "Alarm: smoke"
+    zagrozenie_tresc_smoke: "Sensor {czujnik} detected smoke at {godzina}.\nWhat to do: Leave the home. If you see smoke or fire, call 112."
     zagrozenie_carbon_monoxide: "Alarm: carbon monoxide"
+    zagrozenie_tresc_carbon_monoxide: "Sensor {czujnik} detected carbon monoxide at {godzina}.\nWhat to do: Open the windows, go outside and call 112."
     zagrozenie_gas: "Alarm: gas"
+    zagrozenie_tresc_gas: "Sensor {czujnik} detected gas at {godzina}.\nWhat to do: Do not use fire or switches, open the windows, leave and call 992."
     zagrozenie_moisture: "Alarm: water leak"
-    zagrozenie_inne: "Alarm: hazard"
-    zagrozenie_tresc: "Sensor {czujnik} detected a hazard at {godzina}."
-    co_zrobic_smoke: "What to do: leave the home. If you see smoke or fire, call 112."
-    co_zrobic_carbon_monoxide: "What to do: open the windows, go outside and call 112."
-    co_zrobic_gas: "What to do: no open flame and no switches, open the windows, leave and call the gas emergency number."
-    co_zrobic_moisture: "What to do: shut off the main water valve and check the place near the sensor."
-    co_zrobic_inne: "What to do: check the place near the sensor."
+    zagrozenie_tresc_moisture: "Sensor {czujnik} detected water at {godzina}.\nWhat to do: Shut off the main water valve and check the place near the sensor."
     przyjete_tytul: "Alarm acknowledged"
-    przyjete_tresc: "Acknowledgement: {imie} at {godzina}.\nWhat to do: nothing, someone is already on it."
+    przyjete_tresc: "Acknowledgement: {imie} at {godzina}.\nWhat to do: Nothing, someone is already on it."
     noc_odmowa_tytul: "Alarm not armed for the night"
-    noc_odmowa_tresc: "{powod}.\nWhat to do: fix it and arm the alarm manually."
-    rano_odmowa_tytul: "Alarm still armed for the night"
-    rano_odmowa_tresc: "The panel did not accept disarming after the night.\nWhat to do: disarm the alarm with a code before opening the door."
-    rano_alarm_tresc: "Not disarming: there was an alarm during the night.\nWhat to do: check what triggered it and disarm the alarm manually."
-    rano_restart_tresc: "Not disarming: Home Assistant restarted during the night.\nWhat to do: disarm the alarm manually before opening the door."
+    noc_odmowa_tresc: "{powod}.\nWhat to do: Fix it and arm the alarm manually."
+    rano_odmowa_tytul: "Alarm still armed"
+    rano_odmowa_tresc: "The panel did not accept disarming after the night.\nWhat to do: Disarm the alarm with a code before opening the door."
+    rano_alarm_tresc: "The alarm was not disarmed because there was an alarm during the night.\nWhat to do: Check what triggered it and disarm the alarm manually."
+    rano_restart_tresc: "The alarm was not disarmed because the system restarted during the night.\nWhat to do: Disarm the alarm manually before opening the door."
     wyszli_tytul: "Everyone has left, alarm not armed"
-    wyszli_tresc: "Nobody is home and the alarm is disarmed.\nWhat to do: arm the alarm with the button below."
-    wyszli_kod_tresc: "Nobody is home and the alarm is disarmed.\nWhat to do: open the alarm and arm it with a code."
+    wyszli_tresc: "Nobody is home and the alarm is disarmed.\nWhat to do: Arm the alarm with the button below."
+    wyszli_kod_tresc: "Nobody is home and the alarm is disarmed.\nWhat to do: Open the alarm and arm it with a code."
     uzbrojony_tytul: "Alarm armed"
-    uzbrojony_tresc: "Arming: {imie}, from the notification at {godzina}.\nWhat to do: nothing, the alarm is guarding the home."
+    uzbrojony_tresc: "Arming: {imie}, from the notification at {godzina}.\nWhat to do: Nothing, the alarm is guarding the home."
     uzbroj_odmowa_tytul: "Alarm not armed"
-    uzbroj_odmowa_tresc: "{powod}.\nWhat to do: fix it and arm the alarm again."
+    uzbroj_odmowa_tresc: "{powod}.\nWhat to do: Fix it and arm the alarm again."
     czujniki_tytul: "Alarm sensor not working"
-    czujniki_tresc: "{lista}.\nWhat to do: check the power and range of the sensor or replace the battery."
+    czujniki_tresc: "{lista}.\nWhat to do: Check the power and range of the sensor or replace the battery."
     czujnik_niedostepny_teraz: "{czujnik}: no connection for over 30 min"
     czujnik_niedostepny: "{czujnik}: no connection for {godzin} h"
     czujnik_bateria: "{czujnik}: battery {procent} %"
@@ -311,18 +308,18 @@ variables:
     powod_brak_odczytu: "No reading: {lista}"
     powod_centrala_odmowila: "The panel refused to arm (check its settings and sensors)"
     powod_kod: "The panel requires a code, so the automation does not arm it"
-    p_wyzwolenie: "Triggered the alarm: {czujnik} at {godzina}"
+    p_wyzwolenie: "Alarm triggered: {czujnik} at {godzina}"
     p_alarm: "Alarm: {czujnik} at {godzina}"
     p_zagrozenie: "Hazard: {czujnik} at {godzina}"
     p_przyjete: "Acknowledgement: {imie} at {godzina}"
     p_noc_uzbrojony: "Armed for the night at {godzina}"
-    p_noc_juz_uzbrojony: "Not arming for the night: the alarm is already armed"
+    p_noc_juz_uzbrojony: "Not armed for the night: the alarm is already armed"
     p_noc_odmowa: "Not armed for the night: {powod}"
     p_rano_rozbrojony: "Disarmed after the night at {godzina}"
-    p_rano_nie_ruszam: "Not disarming after the night: the arming was not made by this automation"
-    p_rano_alarm: "Not disarming after the night: there was an alarm during the night"
-    p_rano_restart: "Not disarming after the night: Home Assistant restarted during the night"
+    p_rano_nie_ruszam: "Not disarmed after the night: the arming was not made by this automation"
     p_rano_odmowa: "Not disarmed after the night: the panel refused"
+    p_rano_alarm: "Not disarmed after the night: there was an alarm during the night"
+    p_rano_restart: "Not disarmed after the night: the system restarted during the night"
     p_wyszli: "Reminder: everyone left at {godzina}, alarm disarmed"
     p_uzbrojony: "Arming from the notification: {imie} at {godzina}"
     p_uzbroj_odmowa: "Not armed from the notification: {powod}"
@@ -581,11 +578,9 @@ actions:
           nazwa: "{{ trigger.to_state.name if trigger.to_state is not none else czujnik }}"
           klasa: >-
             {%- set k = state_attr(czujnik, 'device_class') -%}
-            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'inne' }}
+            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'smoke' }}
           tytul: "{{ teksty['zagrozenie_' ~ klasa] }}"
-          tresc: |-
-            {{ teksty.zagrozenie_tresc | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}
-            {{ teksty['co_zrobic_' ~ klasa] }}
+          tresc: "{{ teksty['zagrozenie_tresc_' ~ klasa] | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}"
           dane:
             tag: "alarm_{{ obj }}_zagrozenie_{{ czujnik.split('.')[1] }}"
             channel: "{{ teksty.kanal }}"
@@ -756,14 +751,14 @@ actions:
         value_template: "{{ trigger.id == 'noc_start' and uzbrajaj_na_noc }}"
     then:
       - choose:
-          - alias: Alarm already armed or alarm in progress - not touching it
+          - alias: Alarm already armed or alarm in progress - no change
             conditions:
               - condition: template
                 value_template: "{{ stan != 'disarmed' }}"
             sequence:
               - variables:
                   nowy_powod: "{{ teksty.p_noc_juz_uzbrojony }}"
-          - alias: Panel requires a code - not arming
+          - alias: Panel requires a code - no arming
             conditions:
               - condition: template
                 value_template: "{{ kod_do_uzbrojenia | bool or (not smart_service and not bez_kodu | bool) }}"
@@ -834,7 +829,7 @@ actions:
       - variables:
           po_restarcie: "{{ trigger.id == 'start' }}"
           nowy_powod: ""
-      - alias: Wait for the end of quiet night or a change of the panel state
+      - alias: Waiting for the end of quiet night or a change of the panel state
         wait_template: "{{ is_state(cisza_nocna, 'off') or states(alarm) not in ['arming', 'armed_night'] }}"
         timeout:
           hours: 20
@@ -845,13 +840,13 @@ actions:
           - condition: template
             value_template: "{{ noc_alarm }}"
         then:
-          - alias: There was an alarm during the night - wait until morning
+          - alias: There was an alarm during the night - waiting until morning
             wait_template: "{{ is_state(cisza_nocna, 'off') }}"
             timeout:
               hours: 20
             continue_on_timeout: false
       - choose:
-          - alias: Alarm or restart during the night - not disarming
+          - alias: Alarm or restart during the night - no disarming
             conditions:
               - condition: template
                 value_template: >-
@@ -954,7 +949,7 @@ actions:
                             message: "{{ teksty.rano_odmowa_tresc }}"
                             data:
                               tag: "{{ tag_noc }}"
-          - alias: Armed by an automation, but there was an alarm during the night - not disarming
+          - alias: Armed by an automation, but there was an alarm during the night - no disarming
             conditions:
               - condition: template
                 value_template: >-
@@ -1094,7 +1089,7 @@ actions:
       - condition: template
         value_template: "{{ trigger.id == 'niedostepny' }}"
     then:
-      - alias: During quiet night wait until morning
+      - alias: During quiet night waiting until morning
         wait_template: "{{ cisza_nocna == '' or not is_state(cisza_nocna, 'on') }}"
         timeout:
           hours: 14

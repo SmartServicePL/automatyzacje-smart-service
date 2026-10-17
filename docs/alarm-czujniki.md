@@ -20,7 +20,7 @@ Uzbrojenie „wakacje” (`armed_vacation`) obcej centrali działa jak „poza d
 
 **Włamanie.** Czujnik z listy właściwej dla trybu zmienia stan na „włączony”, a automatyzacja wyzwala centralę: Smart Service Alarm akcją `smartservice_alarm.trigger` z nazwą czujnika, inną centralę akcją `alarm_control_panel.alarm_trigger`. Opóźnienie wejścia i czas trwania alarmu ustawiasz w centrali. Centrala, która nie obsługuje wyzwolenia, dostaje tylko powiadomienia i syreny z automatyzacji.
 
-**Zagrożenie.** Syreny i powiadomienie krytyczne bez zmiany stanu centrali. Treść zależy od rodzaju czujnika (dym, czad, gaz, zalanie) i mówi, co zrobić.
+**Zagrożenie.** Syreny i powiadomienie krytyczne bez zmiany stanu centrali. Tytuł, treść i „Co zrobić” zależą od rodzaju czujnika: dym, czad, gaz albo zalanie (np. „Alarm: dym”, „Czujnik Kuchnia wykrył dym o 23:14.”).
 
 ## Powiadomienia krytyczne
 
@@ -49,8 +49,8 @@ Włamanie przestaje się powtarzać także po rozbrojeniu albo po końcu alarmu 
 **Uzbrajaj na noc według ciszy nocnej.** Wymaga przełącznika ciszy nocnej (`input_boolean`, harmonogram ustawia panel albo Ty).
 - Początek ciszy nocnej: uzbrojenie na noc bez kodu, tylko gdy alarm jest rozbrojony. Uzbrojonego alarmu („poza domem”, „w domu”) ani trwającego alarmu automatyzacja nie rusza.
 - Koniec ciszy nocnej: rozbrojenie bez kodu, tylko gdy to uzbrojenie na noc zrobiła automatyzacja i od tego czasu nie było alarmu. Uzbrojenia ręcznego nie rusza.
-- Był alarm w nocy: rano bez rozbrojenia, powiadomienie „Alarm nadal uzbrojony na noc” z treścią „Nie rozbrajam: w nocy był alarm”.
-- Odmowa centrali (np. otwarte okno z listy czujników sprawdzanych przy uzbrojeniu) = powiadomienie „Nie uzbroiłem alarmu na noc” z powodem, np. „Zamknij: Okno salon”.
+- Był alarm w nocy: rano bez rozbrojenia, powiadomienie „Alarm nadal uzbrojony” z treścią „Alarm nie został rozbrojony, bo w nocy był alarm.”.
+- Odmowa centrali (np. otwarte okno z listy czujników sprawdzanych przy uzbrojeniu) = powiadomienie „Alarm nieuzbrojony na noc” z powodem, np. „Zamknij: Okno salon”.
 - Centrala wymagająca kodu do uzbrojenia: automatyzacja jej nie uzbraja i podaje powód. Kodu nie zapisuje się w automatyzacji.
 
 Z centralą Smart Service Alarm rozbrojenie po nocy działa dzięki jej zasadzie: automatyzacja może rozbroić bez PIN-u tylko uzbrojenie na noc zrobione przez automatyzację, bez alarmu od tego czasu. Dodaj czujniki drzwi i okien do „Czujników sprawdzanych przy uzbrojeniu” w ustawieniach centrali, żeby otwarte okno blokowało uzbrojenie.
@@ -58,9 +58,9 @@ Z centralą Smart Service Alarm rozbrojenie po nocy działa dzięki jej zasadzie
 **Inna centrala** (nie Smart Service Alarm) nie mówi, kto ją uzbroił ani czy w nocy był alarm, więc automatyzacja pamięta noc sama:
 - uzbrajanie na noc działa tylko z centralą bez kodu (`code_format` puste), bo inaczej rano nie dałoby się jej rozbroić;
 - od uzbrojenia na początku ciszy nocnej automatyzacja pilnuje centrali do rana. Rano rozbraja ją tylko wtedy, gdy przez całą noc była w stanie „uzbrajanie” albo „uzbrojony na noc”;
-- przejście w „oczekiwanie” (`pending`) albo „alarm” (`triggered`) w nocy, także krótkie, z powrotem do „uzbrojony na noc”: rano bez rozbrojenia i powiadomienie „Nie rozbrajam: w nocy był alarm”;
+- przejście w „oczekiwanie” (`pending`) albo „alarm” (`triggered`) w nocy, także krótkie, z powrotem do „uzbrojony na noc”: rano bez rozbrojenia i powiadomienie „Alarm nie został rozbrojony, bo w nocy był alarm.”;
 - rozbrojenie albo inne uzbrojenie w nocy przez użytkownika kończy pilnowanie: rano automatyzacja niczego nie zmienia;
-- restart Home Assistant w nocy: pamięć nocy przepada, więc rano bez rozbrojenia i powiadomienie „Nie rozbrajam: w nocy był restart Home Assistant”.
+- restart Home Assistant w nocy: pamięć nocy przepada, więc rano bez rozbrojenia i powiadomienie „Alarm nie został rozbrojony, bo w nocy był restart systemu.”.
 
 ## Wyjście z domu (opcjonalnie)
 
@@ -79,15 +79,15 @@ Dla wszystkich czujników z trzech list:
 ## Powód decyzji (opcjonalnie)
 
 Pomocnik **Tekst** (maks. 255 znaków) dostaje ostatnią decyzję, np.:
-- „Uzbroiłem na noc o 22:00”,
-- „Nie uzbroiłem na noc: Zamknij: Okno salon”,
-- „Wyzwoliłem alarm: Drzwi wejściowe o 23:14”,
+- „Uzbrojony na noc o 22:00”,
+- „Nieuzbrojony na noc: Zamknij: Okno salon”,
+- „Wyzwolenie alarmu: Drzwi wejściowe o 23:14”,
 - „Potwierdzenie: Anna o 23:15”,
-- „Nie rozbrajam po nocy: w nocy był alarm”.
+- „Nie rozbrojony po nocy: w nocy był alarm”.
 
 ## Teksty powiadomień
 
-Wszystkie teksty są na początku sekcji `variables` w mapie `teksty` (tytuł, 1–2 zdania, w nowej linii „Co zrobić: …”). W miejsce `{czujnik}`, `{godzina}`, `{imie}`, `{powod}`, `{lista}`, `{godzin}` i `{procent}` automatyzacja wstawia wartości.
+Wszystkie teksty są na początku sekcji `variables` w mapie `teksty` (tytuł, 1–2 zdania, w nowej linii „Co zrobić: …”), bezosobowo, w brzmieniu zatwierdzonym 17.10.2026. W miejsce `{czujnik}`, `{godzina}`, `{imie}`, `{powod}`, `{lista}`, `{godzin}` i `{procent}` automatyzacja wstawia wartości.
 
 ## Czego potrzebujesz
 
@@ -105,6 +105,7 @@ Opcjonalnie: syreny (`siren`), przełącznik ciszy nocnej (`input_boolean`), dom
 - Czujnik, który był niedostępny już przed restartem, pojawi się w przeglądzie dopiero po dobie od restartu (licznik czasu zaczyna się od nowa).
 - „Potwierdzenie” pokazuje imię osoby przypisanej do konta Home Assistant z aplikacji. Konto bez osoby = „ktoś z domowników”.
 - Uzbrojenie na noc innej automatyzacji centrala Smart Service Alarm traktuje tak samo jak uzbrojenie z tego blueprintu.
+- Czujnik zagrożeń, któremu później zmieniono klasę urządzenia na inną niż dym, czad, gaz albo zalanie, dostaje teksty dymu (najbezpieczniejsze zalecenie).
 
 ## Licencja
 
