@@ -158,6 +158,38 @@
       "linki_dodatkowe": [],
       "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Froboty_inteligentne.yaml",
       "licencja": "MIT"
+    },
+    {
+      "id": "alarm-czujniki",
+      "kategoria": "dom",
+      "nazwa": "Alarm – czujniki i tryb nocny",
+      "wersja": "1.0.0",
+      "min_ha": "2026.7.0",
+      "krotki_opis": "Czujniki domu wyzwalają centralę alarmu, a powiadomienia krytyczne z przyciskiem PRZYJĄŁEM docierają na telefony.",
+      "opis": [
+        "Działa z centralą Smart Service Alarm i z każdą inną centralą alarm_control_panel.",
+        "Drzwi i okna przy każdym uzbrojeniu, ruch tylko poza domem; dym, czad, gaz i zalanie zawsze, bez zmiany stanu centrali.",
+        "Powiadomienie krytyczne co 2 minuty (najwyżej 5 razy) do PRZYJĄŁEM, potem „Potwierdził: imię” u wszystkich; syreny na ustawiony czas albo cichy alarm.",
+        "Opcjonalnie: uzbrajanie na noc według ciszy nocnej, przypomnienie, gdy wszyscy wyszli, pilnowanie łączności i baterii czujników."
+      ],
+      "wymagania": [
+        "Home Assistant 2026.7 lub nowszy",
+        "Integracja Smart Service Alarm albo dowolna centrala alarm_control_panel",
+        "Czujniki binary_sensor (drzwi, okna, ruch, zagrożenia)",
+        "Aplikacja Home Assistant na telefonach (powiadomienia)"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/alarm_czujniki.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/docs/alarm-czujniki.md",
+      "zrzut": "",
+      "repozytorium": "https://github.com/SmartServicePL/automatyzacje-smart-service",
+      "linki_dodatkowe": [
+        {
+          "nazwa": "Integracja Smart Service Alarm",
+          "url": "https://github.com/SmartServicePL/smartservice-alarm"
+        }
+      ],
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Falarm_czujniki.yaml",
+      "licencja": "MIT"
     }
   ]
 }

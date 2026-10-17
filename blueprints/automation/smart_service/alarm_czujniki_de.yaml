@@ -1,0 +1,1097 @@
+blueprint:
+  name: Smart Service - Alarm, Sensoren und Nachtmodus
+  description: |
+    Sensoren im Haus lösen die Alarmzentrale aus, kritische Benachrichtigungen erreichen die Telefone.
+    Funktioniert mit der Zentrale Smart Service Alarm und mit jeder anderen alarm_control_panel-Zentrale.
+    Eine Automation = eine Zentrale.
+
+    Einbruch: Tür- und Fenstersensoren lösen in jedem scharfen Modus aus, Bewegungssensoren
+    nur bei Scharfschaltung "abwesend". Die Eingangsverzögerung übernimmt die Zentrale.
+    Gefahren (Rauch, Kohlenmonoxid, Gas, Wasseraustritt): immer Sirenen und eine kritische Benachrichtigung,
+    ohne Änderung des Zentralenzustands, auch unscharf und während der Nachtruhe.
+
+    Die kritische Benachrichtigung durchbricht "Nicht stören" und kommt alle 2 Minuten wieder
+    (höchstens 5-mal), bis jemand BESTÄTIGEN tippt. Sirenen verstummen beim
+    Unscharfschalten, nach der eingestellten Zeit und nach dem Start von Home Assistant.
+
+    Optional: Scharfschalten für die Nacht nach der Nachtruhe, eine Erinnerung, wenn alle
+    weg sind und der Alarm unscharf ist, und Sensorüberwachung (keine Verbindung, Batterie).
+    Die Automation schaltet den Alarm nie aus einer Benachrichtigung unscharf.
+
+    Helfer (optional): Text (max. 255 Zeichen) für den Grund der letzten Entscheidung.
+  domain: automation
+  author: Smart Service
+  homeassistant:
+    min_version: "2026.7.0"
+  source_url: https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/alarm_czujniki_de.yaml
+  input:
+    centrala_sekcja:
+      name: Alarmzentrale und Sensoren
+      icon: mdi:shield-home
+      input:
+        alarm:
+          name: Alarmzentrale
+          description: Zentrale Smart Service Alarm oder eine beliebige andere alarm_control_panel-Entität.
+          selector:
+            entity:
+              filter:
+                - domain: alarm_control_panel
+        czujniki_obwod:
+          name: Tür- und Fenstersensoren (Außenhaut)
+          description: Lösen den Alarm bei Scharfschaltung abwesend, zu Hause und Nacht aus.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - door
+                    - window
+                    - opening
+                    - garage_door
+        czujniki_ruch:
+          name: Bewegungs- und Präsenzsensoren
+          description: Lösen den Alarm nur bei Scharfschaltung abwesend aus, weil sonst Menschen und Tiere im Haus sind.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - motion
+                    - occupancy
+                    - presence
+        czujniki_zagrozen:
+          name: Gefahrensensoren (Rauch, Kohlenmonoxid, Gas, Wasseraustritt)
+          description: Immer voller Alarm, unabhängig vom Zentralenzustand und der Nachtruhe. Der Zentralenzustand ändert sich nicht.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - smoke
+                    - carbon_monoxide
+                    - gas
+                    - moisture
+    syreny_sekcja:
+      name: Sirenen
+      icon: mdi:alarm-light
+      input:
+        syreny:
+          name: Sirenen (optional)
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: siren
+        syrena_min:
+          name: Laufzeit der Sirenen
+          description: Danach schalten die Sirenen ab. Bei einer Gefahr läuft die Sirene auch so lange, wie der Sensor sie erkennt.
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 10
+              step: 1
+              unit_of_measurement: min
+              mode: slider
+        cichy_alarm:
+          name: Stiller Alarm bei Einbruch
+          description: Ein = Einbruch ohne Sirenen, nur Benachrichtigungen. Gefahren schalten die Sirenen immer ein.
+          default: false
+          selector:
+            boolean: {}
+    powiadomienia_sekcja:
+      name: Benachrichtigungen
+      icon: mdi:cellphone-message
+      input:
+        odbiorcy:
+          name: Telefone
+          description: >-
+            Telefone mit der Home Assistant App. Leer = alle Telefone mit der App.
+            Die Benachrichtigung geht an die Aktion notify.mobile_app_ mit dem Namen des Geräts.
+          default: []
+          selector:
+            device:
+              multiple: true
+              filter:
+                - integration: mobile_app
+    noc_sekcja:
+      name: Nacht und Verlassen des Hauses
+      icon: mdi:weather-night
+      input:
+        uzbrajaj_na_noc:
+          name: Für die Nacht nach der Nachtruhe scharfschalten
+          description: >-
+            Der Beginn der Nachtruhe schaltet den Alarm für die Nacht scharf, ihr Ende unscharf. Funktioniert nur mit einer Zentrale,
+            die ohne Code scharfschaltet, und schaltet nur eine Scharfschaltung durch die Automation unscharf.
+          default: false
+          selector:
+            boolean: {}
+        cisza_nocna:
+          name: Nachtruhe
+          description: Schalter der Nachtruhe (ein = Nacht). Nötig für die Scharfschaltung in der Nacht. Leer = keine Nachtruhe.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+        przypomnij_gdy_wyszli:
+          name: Erinnern, wenn alle weg sind und der Alarm unscharf ist
+          default: false
+          selector:
+            boolean: {}
+        osoby:
+          name: Haushaltsmitglieder
+          description: Personen mit Telefon und Standort. Leer = keine Erinnerung.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: person
+    pomocnik_sekcja:
+      name: Helfer
+      icon: mdi:database
+      input:
+        pomocnik_powod:
+          name: Helfer - Grund der letzten Entscheidung (optional)
+          description: Text-Helfer mit max. Länge 255, z. B. "Nicht für die Nacht scharfgeschaltet - Schließen - Fenster Wohnzimmer".
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_text
+
+mode: parallel
+max: 100
+max_exceeded: warning
+trace:
+  stored_traces: 50
+
+trigger_variables:
+  alarm_tv: !input alarm
+  cisza_tv: !input cisza_nocna
+  obj_tv: "{{ alarm_tv.split('.')[1] if '.' in alarm_tv else alarm_tv }}"
+
+triggers:
+  - trigger: state
+    entity_id: !input czujniki_obwod
+    from: "off"
+    to: "on"
+    id: obwod
+  - trigger: state
+    entity_id: !input czujniki_ruch
+    from: "off"
+    to: "on"
+    id: ruch
+  - trigger: state
+    entity_id: !input alarm
+    to: triggered
+    id: wyzwolona
+  - trigger: state
+    entity_id: !input alarm
+    from: triggered
+    id: wyzwolenie_koniec
+  - trigger: state
+    entity_id: !input alarm
+    to: disarmed
+    id: rozbrojona
+  - trigger: state
+    entity_id: !input czujniki_zagrozen
+    to: "on"
+    id: zagrozenie
+  - trigger: state
+    entity_id: !input czujniki_zagrozen
+    from: "on"
+    to: "off"
+    id: zagrozenie_koniec
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "alarm_przyjalem_w_{{ obj_tv }}"
+    id: przyjalem_w
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "alarm_przyjalem_z_{{ obj_tv }}"
+    id: przyjalem_z
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "alarm_uzbroj_{{ obj_tv }}"
+    id: uzbroj
+  - trigger: template
+    value_template: "{{ cisza_tv != '' and is_state(cisza_tv, 'on') }}"
+    id: noc_start
+  - trigger: template
+    value_template: "{{ cisza_tv != '' and is_state(cisza_tv, 'off') }}"
+    id: noc_koniec
+  - trigger: state
+    entity_id: !input osoby
+    from: home
+    for:
+      minutes: 2
+    id: wyjscie
+  - trigger: state
+    entity_id: !input czujniki_obwod
+    to: unavailable
+    for:
+      minutes: 30
+    id: niedostepny
+  - trigger: state
+    entity_id: !input czujniki_ruch
+    to: unavailable
+    for:
+      minutes: 30
+    id: niedostepny
+  - trigger: state
+    entity_id: !input czujniki_zagrozen
+    to: unavailable
+    for:
+      minutes: 30
+    id: niedostepny
+  - trigger: time
+    at: "09:00:00"
+    id: przeglad
+  - trigger: homeassistant
+    event: start
+    id: start
+
+variables:
+  # Texte der Benachrichtigungen und Gründe. {czujnik}, {godzina}, {imie}, {powod}, {lista}, {godzin} und {procent} werden ersetzt.
+  teksty:
+    kanal: "Notfälle"
+    przycisk_przyjalem: "BESTÄTIGEN"
+    przycisk_uzbroj: "Scharfschalten"
+    przycisk_otworz: "Alarm öffnen"
+    czujnik_centrali: "der Zentrale"
+    ktos: "ein Haushaltsmitglied"
+    wlamanie_tytul: "Alarm: Einbruch"
+    wlamanie_tresc: "Sensor {czujnik} hat um {godzina} den Alarm ausgelöst.\nWas tun: Prüfen Sie das Haus oder die Kameras. Bei einem Fehlalarm schalten Sie den Alarm unscharf."
+    wlamanie_cichy_tresc: "Sensor {czujnik} hat um {godzina} einen stillen Alarm ausgelöst. Die Sirenen sind aus.\nWas tun: Prüfen Sie das Haus oder die Kameras. Bei einem Fehlalarm schalten Sie den Alarm unscharf."
+    zagrozenie_smoke: "Alarm: Rauch"
+    zagrozenie_carbon_monoxide: "Alarm: Kohlenmonoxid"
+    zagrozenie_gas: "Alarm: Gas"
+    zagrozenie_moisture: "Alarm: Wasseraustritt"
+    zagrozenie_inne: "Alarm: Gefahr"
+    zagrozenie_tresc: "Sensor {czujnik} hat um {godzina} eine Gefahr erkannt."
+    co_zrobic_smoke: "Was tun: Verlassen Sie das Haus. Wenn Sie Rauch oder Feuer sehen, rufen Sie 112 an."
+    co_zrobic_carbon_monoxide: "Was tun: Öffnen Sie die Fenster, gehen Sie nach draußen und rufen Sie 112 an."
+    co_zrobic_gas: "Was tun: Kein offenes Feuer und keine Schalter, öffnen Sie die Fenster, verlassen Sie das Haus und rufen Sie den Gas-Notdienst an."
+    co_zrobic_moisture: "Was tun: Schließen Sie den Hauptwasserhahn und prüfen Sie die Stelle am Sensor."
+    co_zrobic_inne: "Was tun: Prüfen Sie die Stelle am Sensor."
+    przyjete_tytul: "Alarm bestätigt"
+    przyjete_tresc: "Bestätigt von: {imie} um {godzina}.\nWas tun: nichts, jemand kümmert sich bereits darum."
+    noc_odmowa_tytul: "Alarm nicht für die Nacht scharfgeschaltet"
+    noc_odmowa_tresc: "{powod}.\nWas tun: Beheben Sie das und schalten Sie den Alarm von Hand scharf."
+    rano_odmowa_tytul: "Alarm noch für die Nacht scharf"
+    rano_odmowa_tresc: "Die Zentrale hat das Unscharfschalten nach der Nacht nicht angenommen.\nWas tun: Schalten Sie den Alarm mit Code unscharf, bevor Sie die Tür öffnen."
+    wyszli_tytul: "Alle sind weg, Alarm nicht scharf"
+    wyszli_tresc: "Niemand ist zu Hause und der Alarm ist unscharf.\nWas tun: Schalten Sie den Alarm mit der Schaltfläche unten scharf."
+    wyszli_kod_tresc: "Niemand ist zu Hause und der Alarm ist unscharf.\nWas tun: Öffnen Sie den Alarm und schalten Sie ihn mit Code scharf."
+    uzbrojony_tytul: "Alarm scharf"
+    uzbrojony_tresc: "Scharfgeschaltet von: {imie} aus der Benachrichtigung um {godzina}.\nWas tun: nichts, der Alarm bewacht das Haus."
+    uzbroj_odmowa_tytul: "Alarm nicht scharfgeschaltet"
+    uzbroj_odmowa_tresc: "{powod}.\nWas tun: Beheben Sie das und schalten Sie den Alarm erneut scharf."
+    czujniki_tytul: "Alarmsensor funktioniert nicht"
+    czujniki_tresc: "{lista}.\nWas tun: Prüfen Sie Stromversorgung und Reichweite des Sensors oder tauschen Sie die Batterie."
+    czujnik_niedostepny_teraz: "{czujnik}: seit über 30 min keine Verbindung"
+    czujnik_niedostepny: "{czujnik}: seit {godzin} h keine Verbindung"
+    czujnik_bateria: "{czujnik}: Batterie {procent} %"
+    czujnik_bateria_slaba: "{czujnik}: Batterie schwach"
+    powod_zamknij: "Schließen: {lista}"
+    powod_brak_odczytu: "Kein Messwert: {lista}"
+    powod_centrala_odmowila: "Die Zentrale hat das Scharfschalten abgelehnt (prüfen Sie ihre Einstellungen und Sensoren)"
+    powod_kod: "Die Zentrale verlangt einen Code, daher schaltet die Automation sie nicht scharf"
+    p_wyzwolenie: "Alarm ausgelöst: {czujnik} um {godzina}"
+    p_alarm: "Alarm: {czujnik} um {godzina}"
+    p_zagrozenie: "Gefahr: {czujnik} um {godzina}"
+    p_przyjete: "Bestätigt von: {imie} um {godzina}"
+    p_noc_uzbrojony: "Für die Nacht scharfgeschaltet um {godzina}"
+    p_noc_juz_uzbrojony: "Keine Scharfschaltung für die Nacht: Der Alarm ist bereits scharf"
+    p_noc_odmowa: "Nicht für die Nacht scharfgeschaltet: {powod}"
+    p_rano_rozbrojony: "Nach der Nacht unscharfgeschaltet um {godzina}"
+    p_rano_nie_ruszam: "Kein Unscharfschalten nach der Nacht: Die Scharfschaltung stammt nicht von dieser Automation oder es gab einen Alarm"
+    p_rano_odmowa: "Nach der Nacht nicht unscharfgeschaltet: Die Zentrale hat abgelehnt"
+    p_wyszli: "Erinnerung: Alle sind um {godzina} gegangen, Alarm unscharf"
+    p_uzbrojony: "Aus der Benachrichtigung scharfgeschaltet ({imie}) um {godzina}"
+    p_uzbroj_odmowa: "Aus der Benachrichtigung nicht scharfgeschaltet: {powod}"
+  alarm: !input alarm
+  czujniki_obwod: !input czujniki_obwod
+  czujniki_ruch: !input czujniki_ruch
+  czujniki_zagrozen: !input czujniki_zagrozen
+  syreny: !input syreny
+  syrena_min: !input syrena_min
+  cichy_alarm: !input cichy_alarm
+  odbiorcy: !input odbiorcy
+  uzbrajaj_na_noc: !input uzbrajaj_na_noc
+  cisza_nocna: !input cisza_nocna
+  przypomnij_gdy_wyszli: !input przypomnij_gdy_wyszli
+  osoby: !input osoby
+  pomocnik_powod: !input pomocnik_powod
+  nowy_powod: ""
+  powod: ""
+  tytul: ""
+  tresc: ""
+  powtorzenia: 5
+  odstep_powtorzen_s: 120
+  prog_baterii: 15
+  obj: "{{ alarm.split('.')[1] }}"
+  stan: "{{ states(alarm) }}"
+  godzina: "{{ '{:02d}:{:02d}'.format(now().hour, now().minute) }}"
+  smart_service: "{{ alarm in integration_entities('smartservice_alarm') }}"
+  obsluguje_wyzwolenie: "{{ (state_attr(alarm, 'supported_features') | int(0)) | bitwise_and(8) > 0 }}"
+  kod_do_uzbrojenia: "{{ state_attr(alarm, 'code_arm_required') is true }}"
+  bez_kodu: "{{ state_attr(alarm, 'code_format') is none }}"
+  syrena_s: "{{ (syrena_min | int(3)) * 60 }}"
+  wszystkie_czujniki: "{{ (czujniki_obwod + czujniki_ruch + czujniki_zagrozen) | unique | list }}"
+  zagrozenie_trwa: "{{ czujniki_zagrozen | select('is_state', 'on') | list | count > 0 }}"
+  wlamanie_trwa: >-
+    {{ is_state(alarm, 'triggered') and not cichy_alarm and states[alarm] is not none
+       and (now() - states[alarm].last_changed).total_seconds() < syrena_s | int }}
+  uslugi: >-
+    {%- set ids = odbiorcy if odbiorcy | count > 0
+          else integration_entities('mobile_app') | map('device_id') | reject('none') | unique | list -%}
+    {%- set ns = namespace(l=[]) -%}
+    {%- for d in ids -%}
+      {%- set n = device_attr(d, 'name') -%}
+      {%- if n -%}{%- set ns.l = ns.l + ['notify.mobile_app_' ~ (n | slugify)] -%}{%- endif -%}
+    {%- endfor -%}
+    {{ ns.l | unique | list }}
+  akcja_przyjalem_w: "alarm_przyjalem_w_{{ obj }}"
+  akcja_przyjalem_z: "alarm_przyjalem_z_{{ obj }}"
+  akcja_uzbroj: "alarm_uzbroj_{{ obj }}"
+  tag_wlamanie: "alarm_{{ obj }}_wlamanie"
+  tag_przyjete: "alarm_{{ obj }}_przyjete"
+  tag_noc: "alarm_{{ obj }}_noc"
+  tag_wyszli: "alarm_{{ obj }}_wyszli"
+  tag_czujniki: "alarm_{{ obj }}_czujniki"
+  tryb_ok: >-
+    {{ (trigger.id == 'obwod' and stan in ['armed_away', 'armed_home', 'armed_night', 'armed_vacation'])
+       or (trigger.id == 'ruch' and stan in ['armed_away', 'armed_vacation']) }}
+  powod_otwartych: >-
+    {%- set ns = namespace(otwarte=[], brak=[]) -%}
+    {%- for e in (czujniki_obwod + czujniki_ruch) | unique -%}
+      {%- set s = states[e] -%}
+      {%- if s is none or s.state in ['unavailable', 'unknown'] -%}{%- set ns.brak = ns.brak + [s.name if s is not none else e] -%}
+      {%- elif s.state == 'on' -%}{%- set ns.otwarte = ns.otwarte + [s.name] -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if ns.otwarte | count > 0 -%}{{ teksty.powod_zamknij | replace('{lista}', ns.otwarte | join(', ')) }}
+    {%- elif ns.brak | count > 0 -%}{{ teksty.powod_brak_odczytu | replace('{lista}', ns.brak | join(', ')) }}
+    {%- else -%}{{ teksty.powod_centrala_odmowila }}
+    {%- endif -%}
+
+actions:
+  - alias: Einbruch - Zentrale auslösen
+    if:
+      - condition: template
+        value_template: "{{ trigger.id in ['obwod', 'ruch'] and tryb_ok | bool }}"
+    then:
+      - variables:
+          nazwa: "{{ trigger.to_state.name if trigger.to_state is not none else trigger.entity_id }}"
+          nowy_powod: "{{ teksty.p_wyzwolenie | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ smart_service }}"
+            sequence:
+              - action: smartservice_alarm.trigger
+                continue_on_error: true
+                target:
+                  entity_id: !input alarm
+                data:
+                  czujnik: "{{ nazwa }}"
+          - conditions:
+              - condition: template
+                value_template: "{{ obsluguje_wyzwolenie }}"
+            sequence:
+              - action: alarm_control_panel.alarm_trigger
+                continue_on_error: true
+                target:
+                  entity_id: !input alarm
+
+  - alias: Einbruch - kritische Benachrichtigungen und Sirenen
+    if:
+      - condition: template
+        value_template: >-
+          {{ trigger.id == 'wyzwolona'
+             or (trigger.id in ['obwod', 'ruch'] and tryb_ok | bool and not smart_service and not obsluguje_wyzwolenie) }}
+    then:
+      - variables:
+          przez_centrale: "{{ trigger.id == 'wyzwolona' }}"
+          nazwa: >-
+            {%- if not przez_centrale -%}{{ trigger.to_state.name if trigger.to_state is not none else trigger.entity_id }}
+            {%- elif state_attr(alarm, 'czujnik_wyzwalajacy') -%}{{ state_attr(alarm, 'czujnik_wyzwalajacy') }}
+            {%- else -%}
+              {%- set ns = namespace(n=teksty.czujnik_centrali, t=0) -%}
+              {%- for e in (czujniki_obwod + czujniki_ruch) | unique -%}
+                {%- set s = states[e] -%}
+                {%- if s is not none and s.last_changed.timestamp() > ns.t
+                     and (now() - s.last_changed).total_seconds() < 300 -%}
+                  {%- set ns.n = s.name -%}
+                  {%- set ns.t = s.last_changed.timestamp() -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ ns.n }}
+            {%- endif -%}
+          tytul: "{{ teksty.wlamanie_tytul }}"
+          tresc: >-
+            {{ (teksty.wlamanie_cichy_tresc if cichy_alarm else teksty.wlamanie_tresc)
+               | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}
+          dane:
+            tag: "{{ tag_wlamanie }}"
+            channel: "{{ teksty.kanal }}"
+            importance: high
+            priority: high
+            ttl: 0
+            push:
+              sound:
+                name: "{{ 'default' }}"
+                critical: 1
+                volume: 1.0
+              interruption-level: critical
+            actions:
+              - action: "{{ akcja_przyjalem_w }}"
+                title: "{{ teksty.przycisk_przyjalem }}"
+          nowy_powod: "{{ teksty.p_alarm | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}"
+      - if:
+          - condition: template
+            value_template: "{{ przez_centrale and pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+      - parallel:
+          - alias: Sirenen bei Einbruch
+            if:
+              - condition: template
+                value_template: "{{ not cichy_alarm and syreny | count > 0 }}"
+            then:
+              - action: siren.turn_on
+                continue_on_error: true
+                target:
+                  entity_id: !input syreny
+              - wait_for_trigger:
+                  - trigger: state
+                    entity_id: !input alarm
+                    to: disarmed
+                  - trigger: state
+                    entity_id: !input alarm
+                    from: triggered
+                timeout:
+                  seconds: "{{ syrena_s }}"
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ is_state(alarm, 'disarmed')
+                         or czujniki_zagrozen | select('is_state', 'on') | list | count == 0 }}
+                then:
+                  - action: siren.turn_off
+                    continue_on_error: true
+                    target:
+                      entity_id: !input syreny
+          - alias: Kritische Benachrichtigung mit Wiederholungen
+            repeat:
+              sequence:
+                - repeat:
+                    for_each: "{{ uslugi }}"
+                    sequence:
+                      - action: "{{ repeat.item }}"
+                        continue_on_error: true
+                        data:
+                          title: "{{ tytul }}"
+                          message: "{{ tresc }}"
+                          data: "{{ dane }}"
+                - wait_for_trigger:
+                    - trigger: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "{{ akcja_przyjalem_w }}"
+                    - trigger: state
+                      entity_id: !input alarm
+                      to: disarmed
+                    - trigger: state
+                      entity_id: !input alarm
+                      from: triggered
+                  timeout:
+                    seconds: "{{ odstep_powtorzen_s }}"
+                  continue_on_timeout: true
+              until:
+                - condition: template
+                  value_template: >-
+                    {{ wait.trigger is not none or repeat.index > powtorzenia | int
+                       or is_state(alarm, 'disarmed')
+                       or (przez_centrale and not is_state(alarm, 'triggered')) }}
+
+  - alias: Ende des Alarmzustands - Sirenen
+    if:
+      - condition: template
+        value_template: >-
+          {{ trigger.id == 'wyzwolenie_koniec' and syreny | count > 0
+             and trigger.to_state is not none and trigger.to_state.state != 'disarmed'
+             and not zagrozenie_trwa | bool }}
+    then:
+      - action: siren.turn_off
+        continue_on_error: true
+        target:
+          entity_id: !input syreny
+
+  - alias: Unscharfschalten - Sirenen immer aus
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'rozbrojona' and syreny | count > 0 }}"
+    then:
+      - action: siren.turn_off
+        continue_on_error: true
+        target:
+          entity_id: !input syreny
+
+  - alias: Gefahr - Sirenen und kritische Benachrichtigung
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'zagrozenie' }}"
+    then:
+      - variables:
+          czujnik: "{{ trigger.entity_id }}"
+          nazwa: "{{ trigger.to_state.name if trigger.to_state is not none else czujnik }}"
+          klasa: >-
+            {%- set k = state_attr(czujnik, 'device_class') -%}
+            {{ k if k in ['smoke', 'carbon_monoxide', 'gas', 'moisture'] else 'inne' }}
+          tytul: "{{ teksty['zagrozenie_' ~ klasa] }}"
+          tresc: |-
+            {{ teksty.zagrozenie_tresc | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}
+            {{ teksty['co_zrobic_' ~ klasa] }}
+          dane:
+            tag: "alarm_{{ obj }}_zagrozenie_{{ czujnik.split('.')[1] }}"
+            channel: "{{ teksty.kanal }}"
+            importance: high
+            priority: high
+            ttl: 0
+            push:
+              sound:
+                name: "{{ 'default' }}"
+                critical: 1
+                volume: 1.0
+              interruption-level: critical
+            actions:
+              - action: "{{ akcja_przyjalem_z }}"
+                title: "{{ teksty.przycisk_przyjalem }}"
+          nowy_powod: "{{ teksty.p_zagrozenie | replace('{czujnik}', nazwa) | replace('{godzina}', godzina) }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+      - parallel:
+          - alias: Sirenen bei Gefahr
+            if:
+              - condition: template
+                value_template: "{{ syreny | count > 0 }}"
+            then:
+              - action: siren.turn_on
+                continue_on_error: true
+                target:
+                  entity_id: !input syreny
+              - wait_for_trigger:
+                  - trigger: event
+                    event_type: mobile_app_notification_action
+                    event_data:
+                      action: "{{ akcja_przyjalem_z }}"
+                  - trigger: state
+                    entity_id: !input alarm
+                    to: disarmed
+                timeout:
+                  seconds: "{{ syrena_s }}"
+                continue_on_timeout: true
+              - alias: Nach der Sirenenzeit - ausschalten, wenn der Sensor keine Gefahr mehr erkennt
+                if:
+                  - condition: template
+                    value_template: >-
+                      {{ wait.trigger is none and is_state(czujnik, 'off')
+                         and czujniki_zagrozen | select('is_state', 'on') | list | count == 0
+                         and not (is_state(alarm, 'triggered') and not cichy_alarm
+                                  and (now() - states[alarm].last_changed).total_seconds() < syrena_s | int) }}
+                then:
+                  - action: siren.turn_off
+                    continue_on_error: true
+                    target:
+                      entity_id: !input syreny
+          - alias: Kritische Benachrichtigung mit Wiederholungen
+            repeat:
+              sequence:
+                - repeat:
+                    for_each: "{{ uslugi }}"
+                    sequence:
+                      - action: "{{ repeat.item }}"
+                        continue_on_error: true
+                        data:
+                          title: "{{ tytul }}"
+                          message: "{{ tresc }}"
+                          data: "{{ dane }}"
+                - wait_for_trigger:
+                    - trigger: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "{{ akcja_przyjalem_z }}"
+                    - trigger: state
+                      entity_id: !input alarm
+                      to: disarmed
+                  timeout:
+                    seconds: "{{ odstep_powtorzen_s }}"
+                  continue_on_timeout: true
+              until:
+                - condition: template
+                  value_template: "{{ wait.trigger is not none or repeat.index > powtorzenia | int }}"
+
+  - alias: Gefahr vorbei - Sirenen nach der eingestellten Zeit
+    if:
+      - condition: template
+        value_template: >-
+          {{ trigger.id == 'zagrozenie_koniec' and syreny | count > 0
+             and (now() - trigger.from_state.last_changed).total_seconds() >= syrena_s | int
+             and not zagrozenie_trwa | bool and not wlamanie_trwa | bool }}
+    then:
+      - action: siren.turn_off
+        continue_on_error: true
+        target:
+          entity_id: !input syreny
+
+  - alias: BESTÄTIGEN - Benachrichtigung bei allen entfernen und mitteilen, wer bestätigt hat
+    if:
+      - condition: template
+        value_template: "{{ trigger.id in ['przyjalem_w', 'przyjalem_z'] }}"
+    then:
+      - variables:
+          uzytkownik: "{{ trigger.event.context.user_id }}"
+          imie: >-
+            {{ states.person | selectattr('attributes.user_id', 'defined')
+               | selectattr('attributes.user_id', 'eq', uzytkownik)
+               | map(attribute='name') | first | default(teksty.ktos, true) }}
+          tagi: >-
+            {%- if trigger.id == 'przyjalem_w' -%}{{ [tag_wlamanie] }}
+            {%- else -%}
+              {%- set ns = namespace(l=[]) -%}
+              {%- for s in czujniki_zagrozen -%}
+                {%- set ns.l = ns.l + ['alarm_' ~ obj ~ '_zagrozenie_' ~ s.split('.')[1]] -%}
+              {%- endfor -%}
+              {{ ns.l }}
+            {%- endif -%}
+          pary: >-
+            {%- set ns = namespace(l=[]) -%}
+            {%- for u in uslugi -%}{%- for t in tagi -%}{%- set ns.l = ns.l + [[u, t]] -%}{%- endfor -%}{%- endfor -%}
+            {{ ns.l }}
+          tresc: "{{ teksty.przyjete_tresc | replace('{imie}', imie) | replace('{godzina}', godzina) }}"
+          nowy_powod: "{{ teksty.p_przyjete | replace('{imie}', imie) | replace('{godzina}', godzina) }}"
+      - if:
+          - condition: template
+            value_template: "{{ trigger.id == 'przyjalem_z' and syreny | count > 0 and not wlamanie_trwa | bool }}"
+        then:
+          - action: siren.turn_off
+            continue_on_error: true
+            target:
+              entity_id: !input syreny
+      - repeat:
+          for_each: "{{ pary }}"
+          sequence:
+            - action: "{{ repeat.item[0] }}"
+              continue_on_error: true
+              data:
+                message: "{{ 'clear_notification' }}"
+                data:
+                  tag: "{{ repeat.item[1] }}"
+      - repeat:
+          for_each: "{{ uslugi }}"
+          sequence:
+            - action: "{{ repeat.item }}"
+              continue_on_error: true
+              data:
+                title: "{{ teksty.przyjete_tytul }}"
+                message: "{{ tresc }}"
+                data:
+                  tag: "{{ tag_przyjete }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+
+  - alias: Beginn der Nachtruhe - Scharfschaltung für die Nacht
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'noc_start' and uzbrajaj_na_noc }}"
+    then:
+      - choose:
+          - alias: Alarm bereits scharf oder Alarm läuft - keine Änderung
+            conditions:
+              - condition: template
+                value_template: "{{ stan != 'disarmed' }}"
+            sequence:
+              - variables:
+                  nowy_powod: "{{ teksty.p_noc_juz_uzbrojony }}"
+          - alias: Zentrale verlangt einen Code - keine Scharfschaltung
+            conditions:
+              - condition: template
+                value_template: "{{ kod_do_uzbrojenia | bool or (not smart_service and not bez_kodu | bool) }}"
+            sequence:
+              - variables:
+                  nowy_powod: "{{ teksty.p_noc_odmowa | replace('{powod}', teksty.powod_kod) }}"
+                  tresc: "{{ teksty.noc_odmowa_tresc | replace('{powod}', teksty.powod_kod) }}"
+              - repeat:
+                  for_each: "{{ uslugi }}"
+                  sequence:
+                    - action: "{{ repeat.item }}"
+                      continue_on_error: true
+                      data:
+                        title: "{{ teksty.noc_odmowa_tytul }}"
+                        message: "{{ tresc }}"
+                        data:
+                          tag: "{{ tag_noc }}"
+        default:
+          - action: alarm_control_panel.alarm_arm_night
+            continue_on_error: true
+            target:
+              entity_id: !input alarm
+          - wait_template: "{{ states(alarm) in ['arming', 'armed_night'] }}"
+            timeout:
+              seconds: "{{ 2 if smart_service else 30 }}"
+            continue_on_timeout: true
+          - if:
+              - condition: template
+                value_template: "{{ states(alarm) in ['arming', 'armed_night'] }}"
+            then:
+              - variables:
+                  nowy_powod: "{{ teksty.p_noc_uzbrojony | replace('{godzina}', godzina) }}"
+            else:
+              - variables:
+                  powod: "{{ powod_otwartych }}"
+                  nowy_powod: "{{ teksty.p_noc_odmowa | replace('{powod}', powod) }}"
+                  tresc: "{{ teksty.noc_odmowa_tresc | replace('{powod}', powod) }}"
+              - repeat:
+                  for_each: "{{ uslugi }}"
+                  sequence:
+                    - action: "{{ repeat.item }}"
+                      continue_on_error: true
+                      data:
+                        title: "{{ teksty.noc_odmowa_tytul }}"
+                        message: "{{ tresc }}"
+                        data:
+                          tag: "{{ tag_noc }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+
+  - alias: Ende der Nachtruhe - Unscharfschalten nach der Nacht
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'noc_koniec' and uzbrajaj_na_noc and stan == 'armed_night' }}"
+    then:
+      - variables:
+          moje_uzbrojenie: >-
+            {%- set s = states[alarm] -%}
+            {%- if smart_service -%}
+              {{ state_attr(alarm, 'uzbrojenie_przez_automat') is true
+                 and state_attr(alarm, 'zmiana_przez') == 'automatyzacja' }}
+            {%- else -%}
+              {%- set od = trigger.from_state.last_changed if trigger.from_state is not none else now() -%}
+              {{ bez_kodu | bool and s.context.user_id is none
+                 and s.last_changed >= od and (s.last_changed - od).total_seconds() <= 900 }}
+            {%- endif -%}
+      - if:
+          - condition: template
+            value_template: "{{ moje_uzbrojenie | bool }}"
+        then:
+          - action: alarm_control_panel.alarm_disarm
+            continue_on_error: true
+            target:
+              entity_id: !input alarm
+          - wait_template: "{{ is_state(alarm, 'disarmed') }}"
+            timeout:
+              seconds: "{{ 2 if smart_service else 30 }}"
+            continue_on_timeout: true
+          - if:
+              - condition: template
+                value_template: "{{ is_state(alarm, 'disarmed') }}"
+            then:
+              - variables:
+                  nowy_powod: "{{ teksty.p_rano_rozbrojony | replace('{godzina}', godzina) }}"
+            else:
+              - variables:
+                  nowy_powod: "{{ teksty.p_rano_odmowa }}"
+              - repeat:
+                  for_each: "{{ uslugi }}"
+                  sequence:
+                    - action: "{{ repeat.item }}"
+                      continue_on_error: true
+                      data:
+                        title: "{{ teksty.rano_odmowa_tytul }}"
+                        message: "{{ teksty.rano_odmowa_tresc }}"
+                        data:
+                          tag: "{{ tag_noc }}"
+        else:
+          - variables:
+              nowy_powod: "{{ teksty.p_rano_nie_ruszam }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+
+  - alias: Alle sind weg - Erinnerung an den unscharfen Alarm
+    if:
+      - condition: template
+        value_template: >-
+          {%- set ns = namespace(dom=false) -%}
+          {%- for e in osoby -%}
+            {%- set s = states[e] -%}
+            {%- if s is not none and s.state == 'home' -%}
+              {%- set ns.dom = true -%}
+            {%- elif s is not none and s.state in ['unknown', 'unavailable']
+                 and (now() - s.last_changed).total_seconds() < 86400 -%}
+              {%- set ns.dom = true -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ trigger.id == 'wyjscie' and przypomnij_gdy_wyszli and osoby | count > 0
+             and stan == 'disarmed' and not ns.dom }}
+    then:
+      - variables:
+          przycisk: >-
+            {%- if kod_do_uzbrojenia | bool -%}
+              {{ dict(action='URI', title=teksty.przycisk_otworz, uri='entityId:' ~ alarm) }}
+            {%- else -%}
+              {{ dict(action=akcja_uzbroj, title=teksty.przycisk_uzbroj) }}
+            {%- endif -%}
+          tresc: "{{ teksty.wyszli_kod_tresc if kod_do_uzbrojenia | bool else teksty.wyszli_tresc }}"
+          nowy_powod: "{{ teksty.p_wyszli | replace('{godzina}', godzina) }}"
+      - repeat:
+          for_each: "{{ uslugi }}"
+          sequence:
+            - action: "{{ repeat.item }}"
+              continue_on_error: true
+              data:
+                title: "{{ teksty.wyszli_tytul }}"
+                message: "{{ tresc }}"
+                data:
+                  tag: "{{ tag_wyszli }}"
+                  actions: "{{ [przycisk] }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+
+  - alias: Aus der Benachrichtigung scharfschalten - nur ohne Code, nie unscharf
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'uzbroj' and stan == 'disarmed' and not kod_do_uzbrojenia | bool }}"
+    then:
+      - variables:
+          uzytkownik: "{{ trigger.event.context.user_id }}"
+          imie: >-
+            {{ states.person | selectattr('attributes.user_id', 'defined')
+               | selectattr('attributes.user_id', 'eq', uzytkownik)
+               | map(attribute='name') | first | default(teksty.ktos, true) }}
+      - action: alarm_control_panel.alarm_arm_away
+        continue_on_error: true
+        target:
+          entity_id: !input alarm
+      - wait_template: "{{ states(alarm) in ['arming', 'armed_away'] }}"
+        timeout:
+          seconds: "{{ 2 if smart_service else 30 }}"
+        continue_on_timeout: true
+      - if:
+          - condition: template
+            value_template: "{{ states(alarm) in ['arming', 'armed_away'] }}"
+        then:
+          - variables:
+              tytul: "{{ teksty.uzbrojony_tytul }}"
+              tresc: "{{ teksty.uzbrojony_tresc | replace('{imie}', imie) | replace('{godzina}', godzina) }}"
+              nowy_powod: "{{ teksty.p_uzbrojony | replace('{imie}', imie) | replace('{godzina}', godzina) }}"
+        else:
+          - variables:
+              powod: "{{ powod_otwartych }}"
+              tytul: "{{ teksty.uzbroj_odmowa_tytul }}"
+              tresc: "{{ teksty.uzbroj_odmowa_tresc | replace('{powod}', powod) }}"
+              nowy_powod: "{{ teksty.p_uzbroj_odmowa | replace('{powod}', powod) }}"
+      - repeat:
+          for_each: "{{ uslugi }}"
+          sequence:
+            - action: "{{ repeat.item }}"
+              continue_on_error: true
+              data:
+                title: "{{ tytul }}"
+                message: "{{ tresc }}"
+                data:
+                  tag: "{{ tag_wyszli }}"
+      - if:
+          - condition: template
+            value_template: "{{ pomocnik_powod != '' }}"
+        then:
+          - action: input_text.set_value
+            continue_on_error: true
+            target:
+              entity_id: "{{ pomocnik_powod }}"
+            data:
+              value: "{{ nowy_powod[:255] }}"
+
+  - alias: Sensor seit 30 Minuten ohne Verbindung
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'niedostepny' }}"
+    then:
+      - alias: Während der Nachtruhe bis zum Morgen warten
+        wait_template: "{{ cisza_nocna == '' or not is_state(cisza_nocna, 'on') }}"
+        timeout:
+          hours: 14
+        continue_on_timeout: false
+      - if:
+          - condition: template
+            value_template: "{{ is_state(trigger.entity_id, 'unavailable') }}"
+        then:
+          - variables:
+              nazwa: "{{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }}"
+              tresc: >-
+                {{ teksty.czujniki_tresc | replace('{lista}', teksty.czujnik_niedostepny_teraz | replace('{czujnik}', nazwa)) }}
+          - repeat:
+              for_each: "{{ uslugi }}"
+              sequence:
+                - action: "{{ repeat.item }}"
+                  continue_on_error: true
+                  data:
+                    title: "{{ teksty.czujniki_tytul }}"
+                    message: "{{ tresc }}"
+                    data:
+                      tag: "{{ tag_czujniki }}"
+
+  - alias: Tägliche Sensorprüfung - Verbindung und Batterien
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'przeglad' and wszystkie_czujniki | count > 0 }}"
+    then:
+      - alias: Während der Nachtruhe bis zu ihrem Ende warten
+        wait_template: "{{ cisza_nocna == '' or not is_state(cisza_nocna, 'on') }}"
+        timeout:
+          hours: 14
+        continue_on_timeout: false
+      - variables:
+          problemy: >-
+            {%- set ns = namespace(l=[], b=[]) -%}
+            {%- for s in wszystkie_czujniki -%}
+              {%- set st = states[s] -%}
+              {%- set n = st.name if st is not none else s -%}
+              {%- if st is not none and st.state == 'unavailable'
+                   and (now() - st.last_changed).total_seconds() >= 86400 -%}
+                {%- set g = ((now() - st.last_changed).total_seconds() / 3600) | round(0) | int -%}
+                {%- set ns.l = ns.l + [teksty.czujnik_niedostepny | replace('{czujnik}', n) | replace('{godzin}', g | string)] -%}
+              {%- endif -%}
+              {%- set d = device_id(s) -%}
+              {%- if d -%}
+                {%- for b in device_entities(d) -%}
+                  {%- if b != s and b not in ns.b and state_attr(b, 'device_class') == 'battery' -%}
+                    {%- if b.startswith('sensor.') and states(b) | is_number and states(b) | float < prog_baterii | float -%}
+                      {%- set ns.b = ns.b + [b] -%}
+                      {%- set ns.l = ns.l + [teksty.czujnik_bateria | replace('{czujnik}', n) | replace('{procent}', states(b) | float | round(0) | int | string)] -%}
+                    {%- elif b.startswith('binary_sensor.') and is_state(b, 'on') -%}
+                      {%- set ns.b = ns.b + [b] -%}
+                      {%- set ns.l = ns.l + [teksty.czujnik_bateria_slaba | replace('{czujnik}', n)] -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.l }}
+      - if:
+          - condition: template
+            value_template: "{{ problemy | count > 0 }}"
+        then:
+          - variables:
+              tresc: "{{ teksty.czujniki_tresc | replace('{lista}', problemy | join('; ')) }}"
+          - repeat:
+              for_each: "{{ uslugi }}"
+              sequence:
+                - action: "{{ repeat.item }}"
+                  continue_on_error: true
+                  data:
+                    title: "{{ teksty.czujniki_tytul }}"
+                    message: "{{ tresc }}"
+                    data:
+                      tag: "{{ tag_czujniki }}"
+
+  - alias: Start von Home Assistant - Sirenen aus ohne Alarm
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'start' and syreny | count > 0 and not zagrozenie_trwa | bool }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ not is_state(alarm, 'triggered') }}"
+        then:
+          - action: siren.turn_off
+            continue_on_error: true
+            target:
+              entity_id: !input syreny
+        else:
+          - alias: Alarm läuft - Sirenen bis zum Ende der eingestellten Zeit
+            wait_for_trigger:
+              - trigger: state
+                entity_id: !input alarm
+                from: triggered
+            timeout:
+              seconds: >-
+                {{ [syrena_s | int - (now() - states[alarm].last_changed).total_seconds() | int, 0] | max }}
+            continue_on_timeout: true
+          - if:
+              - condition: template
+                value_template: "{{ czujniki_zagrozen | select('is_state', 'on') | list | count == 0 }}"
+            then:
+              - action: siren.turn_off
+                continue_on_error: true
+                target:
+                  entity_id: !input syreny

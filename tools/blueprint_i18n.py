@@ -37,7 +37,7 @@ TEXT_KEYS = {
     "tytul", "tresc", "nowy_powod",
 }
 # Mappings whose values (not keys) are labels shown to people.
-LABEL_MAPS: set[str] = set()
+LABEL_MAPS = {"teksty"}
 # Templates whose whole output is a message for people (the reason shown in traces).
 # Every word outside the tags is text there, also a single word on its own line.
 MESSAGE_TEMPLATES = {"powod_blokady"}
@@ -49,6 +49,7 @@ PAIRS = (
     (BLUEPRINTS / "koszenie.yaml", ROOT / "i18n" / "koszenie.yaml"),
     (BLUEPRINTS / "roboty_sprzatajace.yaml", ROOT / "i18n" / "roboty_sprzatajace.yaml"),
     (BLUEPRINTS / "roboty_inteligentne.yaml", ROOT / "i18n" / "roboty_inteligentne.yaml"),
+    (BLUEPRINTS / "alarm_czujniki.yaml", ROOT / "i18n" / "alarm_czujniki.yaml"),
 )
 
 POLISH_LETTERS = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")

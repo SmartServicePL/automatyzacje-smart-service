@@ -1,5 +1,10 @@
 # Zmiany
 
+## 2026-10-17 (3)
+
+- Nowa pozycja **Alarm – czujniki i tryb nocny** 1.0.0 (`alarm_czujniki.yaml`, wersje `_en` i `_de`), jedna automatyzacja na centralę. Działa z centralą Smart Service Alarm (wyzwolenie `smartservice_alarm.trigger` z nazwą czujnika) i z każdą inną centralą `alarm_control_panel` (`alarm_control_panel.alarm_trigger`). Czujniki drzwi i okien wyzwalają alarm przy każdym uzbrojeniu, czujniki ruchu tylko poza domem. Dym, czad, gaz i zalanie zawsze włączają syreny i powiadomienie krytyczne, bez zmiany stanu centrali. Powiadomienie krytyczne (Android: kanał „awarie”, priorytet wysoki; iOS: dźwięk krytyczny) wraca co 2 minuty, najwyżej 5 razy, do naciśnięcia PRZYJĄŁEM, które gasi je na wszystkich telefonach i wysyła „Potwierdził: imię”. Syreny na ustawiony czas, cichy alarm przy włamaniu, wyłączanie syren przy rozbrojeniu i po starcie Home Assistant. Opcjonalnie: uzbrajanie na noc według ciszy nocnej z rozbrojeniem rano tylko własnego uzbrojenia, przypomnienie, gdy wszyscy wyszli (przycisk „Uzbrój” tylko przy centrali bez kodu do uzbrojenia, nigdy rozbrojenie z powiadomienia), pilnowanie łączności i baterii czujników (próg 15%), powód decyzji w pomocniku. Zrzut formularza zostanie dodany później.
+- Generator tłumaczeń: nowy blueprint w `PAIRS`, wartości mapy `teksty` traktowane jako teksty do tłumaczenia.
+
 ## 2026-10-17 (2)
 
 - **Inteligentny robot sprzątający – każda marka** 1.1.0. Istniejące wejścia bez zmian.
