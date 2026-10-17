@@ -157,7 +157,8 @@
       "repozytorium": "https://github.com/SmartServicePL/automatyzacje-smart-service",
       "linki_dodatkowe": [],
       "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Froboty_inteligentne.yaml",
-      "licencja": "MIT"
+      "licencja": "MIT",
+      "ikona": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/ikony/robot_inteligentny.png"
     },
     {
       "id": "alarm-czujniki",
@@ -189,7 +190,8 @@
         }
       ],
       "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Falarm_czujniki.yaml",
-      "licencja": "MIT"
+      "licencja": "MIT",
+      "ikona": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/ikony/alarm_czujniki.png"
     }
   ]
 }
