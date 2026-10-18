@@ -76,7 +76,7 @@
       "id": "podlewanie",
       "kategoria": "ogrod",
       "nazwa": "Inteligentne podlewanie ogrodu – 1 do 12 sekcji",
-      "wersja": "1.6.0",
+      "wersja": "1.12.0",
       "min_ha": "2025.4.0",
       "krotki_opis": "Podlewa każdą sekcję wtedy, gdy gleba tego potrzebuje, z bilansem wody, prognozą i zmierzonym deszczem.",
       "opis": [
