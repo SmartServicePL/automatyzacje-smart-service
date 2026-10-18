@@ -888,7 +888,8 @@ actions:
           - variables:
               S: >-
                 {%- set s = states(pomocnik_stan) -%}
-                {{ s | from_json if s.startswith('{') else {} }}
+                {%- set S0 = s | from_json if s.startswith('{') else {} -%}
+                {{ dict(S0, kb=1) if S0.get('s', '') == 'k' and st in ['paused', 'error'] and kod_bledu != '' else S0 }}
               od: "{{ S.get('od', 0) | int }}"
               zrodlo: "{{ S.get('s', 'a') }}"
               czas_s: >-
@@ -909,6 +910,18 @@ actions:
                    and (m2 | float < 0 or mediana | float < 0
                         or m2 | float >= mediana | float * min_powierzchnia_procent | float / 100) }}
               stan_wznowienie: "{{ S.get('wr', 0) | int }}"
+          - alias: Kuweta - zapamiętaj usterkę w trakcie
+            if:
+              - condition: template
+                value_template: >-
+                  {%- set s = states(pomocnik_stan) -%}
+                  {{ S.get('kb', 0) | int == 1 and (s | from_json if s.startswith('{') else {}).get('kb', 0) | int == 0 }}
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_stan
+                data:
+                  value: "{%- set J = S -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
           - choose:
               - alias: Koniec - robot w stacji wystarczająco długo
                 conditions:
@@ -916,6 +929,21 @@ actions:
                     value_template: "{{ st in stany_stacji and od_zmiany >= potwierdzenie_w_stacji_min | int * 60 }}"
                 sequence:
                   - choose:
+                      - alias: Szybkie sprzątanie przy kuwecie przerwane usterką
+                        conditions:
+                          - condition: template
+                            value_template: "{{ zrodlo == 'k' and S.get('kb', 0) | int == 1 }}"
+                        sequence:
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_stan
+                            data:
+                              value: "{%- set J = dict(S, od=0, kb=0, s='', e=teraz, kf=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], wr=0) | to_json) }}"
+                          - action: input_text.set_value
+                            target:
+                              entity_id: !input pomocnik_powod
+                            data:
+                              value: "Kuweta: przerwane - usterka ({{ now().strftime('%H:%M') }})"
                       - alias: Szybkie sprzątanie przy kuwecie zakończone
                         conditions:
                           - condition: template
@@ -925,7 +953,7 @@ actions:
                             target:
                               entity_id: !input pomocnik_stan
                             data:
-                              value: "{%- set J = dict(S, od=0, k=0, s='', e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
+                              value: "{%- set J = dict(S, od=0, k=0, kb=0, s='', e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
                           - action: input_text.set_value
                             target:
                               entity_id: !input pomocnik_powod
@@ -1439,7 +1467,7 @@ actions:
                 target:
                   entity_id: !input pomocnik_stan
                 data:
-                  value: "{%- set J = dict(S, od=teraz, s='k', kf=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
+                  value: "{%- set J = dict(S, od=teraz, s='k', kf=teraz, kb=0) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
               - action: input_text.set_value
                 target:
                   entity_id: !input pomocnik_powod

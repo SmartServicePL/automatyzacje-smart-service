@@ -55,7 +55,7 @@ Robot nigdy nie startuje:
 - **Nie wystartował:** robot w ciągu 5 min nie ruszył albo od razu stanął z błędem. Wtedy powiadomienie i ponowienie po 3 h.
 - **Ktoś wrócił** do pustego domu w trakcie sprzątania: robot wraca do stacji i dokończy później (albo staje, jeśli to obsługuje, albo sprząta dalej).
 - **Sprzątanie uruchomione ręcznie** (w aplikacji albo na robocie) jest rozpoznawane. Pełne sprzątanie zeruje licznik brudu, a niepełne nie wywołuje powiadomień.
-- **Kuweta** (opcjonalnie): po ustawionej liczbie użyć robot szybko sprząta wybrany obszar, w godzinach 9–21.
+- **Kuweta** (opcjonalnie): po ustawionej liczbie użyć robot szybko sprząta wybrany obszar, w godzinach 9–21. Gdy w trakcie robot zgłosi usterkę, sprzątanie liczy się jako przerwane: licznik użyć zostaje, a kolejna próba będzie najwcześniej po godzinie.
 
 ## Powód decyzji
 

@@ -2,6 +2,8 @@
 
 ## 2026-10-18
 
+- **Inteligentny robot sprzątający – każda marka** 1.1.2. Wejścia bez zmian.
+  - Kuweta: gdy robot w trakcie szybkiego sprzątania stanie z kodem błędu, po powrocie do stacji wynik to „Kuweta: przerwane - usterka”, a nie „obszar posprzątany”. Licznik użyć się nie zeruje, kolejna próba najwcześniej po godzinie.
 - **Inteligentny robot sprzątający – każda marka** 1.1.1. Wejścia bez zmian.
   - Tryb podglądu: decyzja o sprzątaniu przy kuwecie jest zapisywana raz (z godziną) i licznik kuwety się zeruje, tak jak po prawdziwym sprzątaniu. Wcześniej ten sam komunikat wracał co 5 minut na zmianę z „Czekam”.
 
