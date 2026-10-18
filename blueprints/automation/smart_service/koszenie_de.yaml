@@ -9,9 +9,15 @@ blueprint:
     - der Mäher in der Ladestation steht und der Akku ausreichend geladen ist,
     - der eingestellte Abstand seit dem letzten Mähen vergangen ist (Datums-Helfer),
     - es nicht regnet und seit dem letzten Regen die Trocknungszeit des Rasens vergangen ist (optional),
+    - in den letzten 24 Stunden weniger als 1 mm Regen gefallen ist (optional),
+    - keine Nachtruhe gilt (optional),
     - die stündliche Vorhersage für die nächsten Stunden keinen Regen erwartet (optional),
     - die Temperatur im zulässigen Bereich liegt und kein Tau vorhanden ist (optional),
     - keine Sperre eingeschaltet ist (optional).
+
+    Ist ein 24-Stunden-Regensensor gesetzt und sind beide Quellen (Haupt- und Reserve-)
+    nicht verfügbar, ist das Wetter unbekannt und der Mäher fährt nicht aus. Der Grund der letzten
+    Entscheidung kann in einen Text-Helfer geschrieben werden.
 
     Standardmäßig ist das Mähen nicht auf Uhrzeiten oder Tage beschränkt. In den Abschnitten "Zeitplan"
     und "Sicherheit" können Sie aktivieren: ausgewählte Wochentage, ein Zeitfenster,
@@ -70,6 +76,16 @@ blueprint:
             entity:
               filter:
                 - domain: input_datetime
+        pomocnik_powod:
+          name: Helfer - Grund der letzten Entscheidung (optional)
+          description: >-
+            Text-Helfer mit höchstens 255 Zeichen. Er hält fest, warum der Mäher mäht oder wartet,
+            auch wenn die Reserve-Wetterquelle genutzt wird oder das Wetter unbekannt ist.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_text
     harmonogram_sekcja:
       name: Zeitplan
       icon: mdi:calendar-clock
@@ -152,10 +168,36 @@ blueprint:
               step: 5
               unit_of_measurement: min
               mode: slider
+        cisza_nocna:
+          name: Nachtruhe (optional)
+          description: Schalter, Zeitplan oder Sensor. An = der Mäher fährt nicht aus. Ein Mäher, der bereits mäht, beendet seine Arbeit.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+                - domain: schedule
+                - domain: binary_sensor
     pogoda_sekcja:
       name: Wetter
       icon: mdi:weather-partly-rainy
       input:
+        pogoda_opad_24h_wstecz:
+          name: Regen der letzten 24 Stunden - Hauptquelle (optional)
+          description: Regensensor in mm. Wenn gesetzt und verfügbar, hat er Vorrang. Mindestens 1 mm = nasses Gras, der Mäher fährt nicht aus.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        deszcz_24h:
+          name: Regen in 24 Stunden - Reserve (optional)
+          description: Eigener Regensensor in mm, genutzt, wenn die Hauptquelle nicht verfügbar oder nicht gesetzt ist. Der Wechsel auf die Reserve wird im Grund-Helfer festgehalten.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
         czujniki_deszczu:
           name: Regensensoren (optional)
           description: >-
@@ -456,6 +498,27 @@ variables:
   deszcz_do_bazy: !input deszcz_do_bazy
   powiadom_o_starcie: !input powiadom_o_starcie
   nazwa: "{{ state_attr(kosiarka, 'friendly_name') or kosiarka }}"
+  pomocnik_powod: !input pomocnik_powod
+  cisza_nocna: !input cisza_nocna
+  pogoda_opad_24h_wstecz: !input pogoda_opad_24h_wstecz
+  deszcz_24h: !input deszcz_24h
+  # glowne = Hauptquelle, rezerwa = Hauptquelle gesetzt, aber nicht verfügbar (Reserve aktiv),
+  # zapas = nur Reserve gesetzt, nieznane = gesetzte Quellen nicht verfügbar, brak = keine Regenquelle gesetzt.
+  zrodlo_pogody: >-
+    {%- set glowne = pogoda_opad_24h_wstecz != '' -%}
+    {%- set zapas = deszcz_24h != '' -%}
+    {%- if glowne and states(pogoda_opad_24h_wstecz) | is_number -%}glowne
+    {%- elif zapas and states(deszcz_24h) | is_number -%}{{ 'rezerwa' if glowne else 'zapas' }}
+    {%- elif glowne or zapas -%}nieznane
+    {%- else -%}brak
+    {%- endif -%}
+  opad_24h_mm: >-
+    {%- if zrodlo_pogody == 'glowne' -%}{{ states(pogoda_opad_24h_wstecz) | float(0) }}
+    {%- elif zrodlo_pogody in ['rezerwa', 'zapas'] -%}{{ states(deszcz_24h) | float(0) }}
+    {%- else -%}0
+    {%- endif -%}
+  pogoda_dopisek: >-
+    {{ '(Reservewetter)' if zrodlo_pogody == 'rezerwa' else ('(Wetter unbekannt)' if zrodlo_pogody == 'nieznane' else '') }}
   # Leerer Text = alle Startbedingungen erfüllt (außer der Vorhersage, die separat geprüft wird).
   powod_blokady: >-
     {%- set brak = ['unknown', 'unavailable', 'none', ''] -%}
@@ -498,12 +561,18 @@ variables:
       der Mäher steht nicht in der Ladestation (Zustand: {{ states(kosiarka) }})
     {%- elif nastepne > teraz -%}
       zu früh, nächstes Mähen ab {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+    {%- elif cisza_nocna != '' and is_state(cisza_nocna, 'on') -%}
+      Nachtruhe
     {%- elif bateria and states(bateria) in brak -%}
       kein Akkuwert verfügbar
     {%- elif bateria and states(bateria) | float(0) < min_bateria | float(0) -%}
       Akku {{ states(bateria) }} %, Minimum {{ min_bateria | int }} %
     {%- elif ns.deszcz -%}
       es regnet
+    {%- elif zrodlo_pogody == 'nieznane' -%}
+      Wetter unbekannt, kein 24-Stunden-Regenwert
+    {%- elif opad_24h_mm | float(0) >= 1 -%}
+      in 24 Stunden sind {{ opad_24h_mm | float(0) | round(1) }} mm Regen gefallen, das Gras ist nass
     {%- elif ns.mokro > 0 -%}
       der Rasen trocknet nach Regen bis {{ ns.mokro | timestamp_custom('%H:%M') }}
     {%- elif temperatura and t is none -%}
@@ -562,11 +631,30 @@ actions:
                     {%- if ns.n == 0 -%}brak
                     {%- elif ns.opad > max_opad_mm | float or ns.p > max_prawdopodobienstwo | float -%}deszcz
                     {%- else -%}ok{%- endif -%}
-              - alias: Ohne stündliche Vorhersage nur starten, wenn Regensensoren vorhanden sind
-                condition: template
-                value_template: >-
-                  {{ ocena_prognozy == 'ok'
-                     or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0) }}
+              - if:
+                  - condition: template
+                    alias: Ohne stündliche Vorhersage nur starten, wenn Regensensoren vorhanden sind
+                    value_template: >-
+                      {{ not (ocena_prognozy == 'ok'
+                              or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0)) }}
+                then:
+                  - variables:
+                      nowy_powod: >-
+                        {%- if ocena_prognozy == 'deszcz' -%}
+                          Kein Mähen - die Vorhersage zeigt Regen in den nächsten {{ prognoza_godz | int(3) }} h{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                        {%- else -%}
+                          Kein Mähen - keine stündliche Vorhersage und kein Regensensor{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                        {%- endif -%}
+                  - if:
+                      - condition: template
+                        value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: "{{ pomocnik_powod }}"
+                        data:
+                          value: "{{ nowy_powod[:255] }}"
+                  - stop: Die Vorhersage erlaubt keinen Start.
           - action: lawn_mower.start_mowing
             target:
               entity_id: !input kosiarka
@@ -589,8 +677,32 @@ actions:
                   tresc: >-
                     Der Mäher hat die Ladestation nach dem Startbefehl nicht verlassen (Zustand: {{ states(kosiarka) }}).
                     Nächster Versuch frühestens in {{ ponowienie_godz }} h.
+                  nowy_powod: >-
+                    Kein Mähen - der Mäher hat die Ladestation nach dem Startbefehl nicht verlassen{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+              - if:
+                  - condition: template
+                    value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ pomocnik_powod }}"
+                    data:
+                      value: "{{ nowy_powod[:255] }}"
               - sequence: !input akcje_powiadomien
             else:
+              - variables:
+                  nowy_powod: >-
+                    {%- set suchy = 'Gras ist trocken' if zrodlo_pogody != 'brak' else 'Bedingungen erfüllt' -%}
+                    Mähe ab {{ now().strftime('%H:%M') }} - {{ suchy }}{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+              - if:
+                  - condition: template
+                    value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ pomocnik_powod }}"
+                    data:
+                      value: "{{ nowy_powod[:255] }}"
               - if:
                   - condition: template
                     value_template: "{{ powiadom_o_starcie }}"
@@ -599,6 +711,32 @@ actions:
                       tytul: "{{ nazwa }}: Mähen gestartet"
                       tresc: Der Mäher hat die Ladestation um {{ now().strftime('%H:%M') }} verlassen.
                   - sequence: !input akcje_powiadomien
+
+      - alias: Grund festhalten, warum der Mäher nicht ausfährt
+        conditions:
+          - condition: trigger
+            id: sprawdz
+          - condition: template
+            value_template: >-
+              {{ pomocnik_powod != ''
+                 and (is_state(kosiarka, 'docked') or zrodlo_pogody in ['rezerwa', 'nieznane']) }}
+        sequence:
+          - variables:
+              nowy_powod: >-
+                {%- if is_state(kosiarka, 'docked') -%}
+                  Kein Mähen - {{ powod_blokady | trim }}{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                {%- else -%}
+                  Mäher außerhalb der Ladestation (Status: {{ states(kosiarka) }}){{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                {%- endif -%}
+          - if:
+              - condition: template
+                value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ pomocnik_powod }}"
+                data:
+                  value: "{{ nowy_powod[:255] }}"
 
       - alias: Mähen bestätigt - nächsten Termin festlegen
         conditions:

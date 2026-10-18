@@ -1,5 +1,15 @@
 # Zmiany
 
+## 2026-10-19
+
+- **Automatyczne koszenie – każda kosiarka** 1.1.0. Istniejące wejścia bez zmian; nowe są opcjonalne i domyślnie puste.
+  - Nowe wejścia `pogoda_opad_24h_wstecz` (źródło główne, sensor opadu z 24 godzin w mm; panel wypełnia go czujnikiem MIGIELS) i `deszcz_24h` (własny czujnik, zapas). Co najmniej 1 mm w ciągu doby = trawa mokra, brak startu. Istniejące czujniki deszczu (`czujniki_deszczu`) działają jak dotąd.
+  - Pogoda nieznana: gdy podano któryś czujnik opadu z 24 godzin, a żaden nie jest dostępny, kosiarka nie wyjeżdża.
+  - Nowe wejście `cisza_nocna` (przełącznik, harmonogram lub czujnik): w ciszy nocnej kosiarka nie wyjeżdża, trwające koszenie nie jest przerywane.
+  - Nowe wejście `pomocnik_powod` (pomocnik Tekst, do 255 znaków): ostatnia decyzja lub powód odmowy, np. „Koszę od 11:00 - trawa sucha”, także dla odmowy z powodu prognozy. Przejście na zapas dopisuje „(pogoda zapasowa)”, nieznana pogoda „(pogoda nieznana)”; oba wpisy powstają zawsze.
+  - Testy: `tests/test_koszenie_deszcz.py` (pierwszeństwo, zapas, pogoda nieznana, cisza nocna, stałość nazw wejść, teksty powodu). Wersje EN i DE przebudowane z katalogu tłumaczeń.
+- **Smart mowing schedule (Worx)**: wersja 0.11.0 w repozytorium `worx_vision_cloud_plus_automation` z tymi samymi wejściami (`pogoda_opad_24h_wstecz`, `deszcz_24h`, `cisza_nocna`, `pomocnik_powod`); dotychczasowy „Zmierzony opad” zostaje ostatnim zapasem, a czujnik deszczu kosiarki bez zmian.
+
 ## 2026-10-18
 
 - **Inteligentny robot sprzątający – każda marka** 1.1.2. Wejścia bez zmian.

@@ -16,6 +16,8 @@ Co 10 minut sprawdza, czy można kosić. Kosiarka startuje, gdy jednocześnie:
 - minął odstęp od ostatniego koszenia,
 - nie pada, a od końca deszczu minął czas schnięcia trawy (gdy wybrano czujnik deszczu),
 - prognoza godzinowa nie przewiduje deszczu w najbliższych godzinach (gdy wybrano prognozę),
+- w ciągu ostatnich 24 godzin nie spadło co najmniej 1 mm deszczu (gdy wybrano czujnik opadu z 24 godzin),
+- nie trwa cisza nocna (gdy ją wybrano),
 - temperatura mieści się w zakresie i na trawie nie ma rosy (gdy wybrano czujniki),
 - żadna blokada nie jest włączona.
 
@@ -34,6 +36,21 @@ W trakcie koszenia:
 | Nie kosić, gdy ktoś jest w ogrodzie | Brak startu, gdy któryś czujnik ma stan „on”. Gdy ktoś wejdzie podczas koszenia, kosiarka wraca do bazy albo staje na trawniku. |
 
 Bez tych opcji kosiarka może wystartować o każdej porze doby.
+
+### Opad z 24 godzin, cisza nocna i powód decyzji
+
+Wszystkie cztery wejścia są opcjonalne i domyślnie puste. Istniejące automatyzacje działają bez nich tak samo jak dotąd.
+
+| Wejście | Co robi |
+|---|---|
+| Opad z ostatnich 24 godzin - źródło główne (`pogoda_opad_24h_wstecz`) | Sensor opadu w mm. Gdy jest dostępny, ma pierwszeństwo. Co najmniej 1 mm w ciągu doby = trawa mokra i kosiarka nie wyjeżdża. Panel Smart Service wypełnia go swoim czujnikiem. |
+| Opad z 24 godzin - zapas (`deszcz_24h`) | Własny sensor opadu w mm. Używany, gdy źródło główne jest niedostępne albo nie podano go wcale. |
+| Cisza nocna (`cisza_nocna`) | Przełącznik, harmonogram lub czujnik. Włączony = kosiarka nie wyjeżdża. Kosiarka, która już kosi, kończy pracę. |
+| Pomocnik - powód ostatniej decyzji (`pomocnik_powod`) | Pomocnik **Tekst** (do 255 znaków). Zapisuje się w nim ostatnia decyzja, np. „Koszę od 11:00 - trawa sucha” albo „Nie koszę - cisza nocna”. |
+
+Czujniki deszczu (`binary_sensor` kosiarki lub stacji) działają jak dotąd: pada = brak startu, a czas schnięcia liczy się od ostatniej zmiany na „off”.
+
+**Pogoda nieznana.** Gdy podano co najmniej jeden z dwóch czujników opadu z 24 godzin, a żaden nie jest dostępny, kosiarka nie wyjeżdża. W pomocniku powodu pojawia się „Nie koszę - pogoda nieznana … (pogoda nieznana)”. Gdy działa tylko zapas, wpis kończy się dopiskiem „(pogoda zapasowa)”. Oba dopiski są zapisywane zawsze, także gdy kosiarka stoi z innego powodu.
 
 ## Czego potrzebujesz
 

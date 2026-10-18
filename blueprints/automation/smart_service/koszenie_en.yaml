@@ -9,9 +9,15 @@ blueprint:
     - the mower is docked and its battery is charged enough,
     - the set interval since the last mowing has passed (date helper),
     - it is not raining and the grass drying time since the last rain has passed (optional),
+    - less than 1 mm of rain fell in the last 24 hours (optional),
+    - quiet night is not in effect (optional),
     - the hourly forecast shows no rain in the next few hours (optional),
     - the temperature is within the allowed range and there is no dew (optional),
     - no block is switched on (optional).
+
+    If a 24-hour rain sensor is set and both sources (main and reserve) are
+    unavailable, the weather is unknown and the mower does not go out. The reason of the last
+    decision can be written to a Text helper.
 
     By default, mowing is not limited to any hours or days. In the "Schedule"
     and "Safety" sections you can enable: selected weekdays, a time window,
@@ -70,6 +76,16 @@ blueprint:
             entity:
               filter:
                 - domain: input_datetime
+        pomocnik_powod:
+          name: Helper - reason of the last decision (optional)
+          description: >-
+            Text helper, 255 characters at most. It records why the mower mows or waits,
+            also when the reserve weather source is in use or the weather is unknown.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_text
     harmonogram_sekcja:
       name: Schedule
       icon: mdi:calendar-clock
@@ -152,10 +168,36 @@ blueprint:
               step: 5
               unit_of_measurement: min
               mode: slider
+        cisza_nocna:
+          name: Quiet night (optional)
+          description: Switch, schedule or sensor. On = the mower does not go out. A mower that is already mowing finishes its work.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+                - domain: schedule
+                - domain: binary_sensor
     pogoda_sekcja:
       name: Weather
       icon: mdi:weather-partly-rainy
       input:
+        pogoda_opad_24h_wstecz:
+          name: Rain in the last 24 hours - main source (optional)
+          description: Rain sensor in mm. When set and available, it takes priority. At least 1 mm = wet grass, the mower does not go out.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        deszcz_24h:
+          name: Rain in 24 hours - reserve (optional)
+          description: Your own rain sensor in mm, used when the main source is unavailable or not set. Switching to the reserve is recorded in the reason helper.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
         czujniki_deszczu:
           name: Rain sensors (optional)
           description: >-
@@ -456,6 +498,27 @@ variables:
   deszcz_do_bazy: !input deszcz_do_bazy
   powiadom_o_starcie: !input powiadom_o_starcie
   nazwa: "{{ state_attr(kosiarka, 'friendly_name') or kosiarka }}"
+  pomocnik_powod: !input pomocnik_powod
+  cisza_nocna: !input cisza_nocna
+  pogoda_opad_24h_wstecz: !input pogoda_opad_24h_wstecz
+  deszcz_24h: !input deszcz_24h
+  # glowne = main source, rezerwa = main set but unavailable (reserve in use),
+  # zapas = only the reserve set, nieznane = the set sources are unavailable, brak = no rain source set.
+  zrodlo_pogody: >-
+    {%- set glowne = pogoda_opad_24h_wstecz != '' -%}
+    {%- set zapas = deszcz_24h != '' -%}
+    {%- if glowne and states(pogoda_opad_24h_wstecz) | is_number -%}glowne
+    {%- elif zapas and states(deszcz_24h) | is_number -%}{{ 'rezerwa' if glowne else 'zapas' }}
+    {%- elif glowne or zapas -%}nieznane
+    {%- else -%}brak
+    {%- endif -%}
+  opad_24h_mm: >-
+    {%- if zrodlo_pogody == 'glowne' -%}{{ states(pogoda_opad_24h_wstecz) | float(0) }}
+    {%- elif zrodlo_pogody in ['rezerwa', 'zapas'] -%}{{ states(deszcz_24h) | float(0) }}
+    {%- else -%}0
+    {%- endif -%}
+  pogoda_dopisek: >-
+    {{ '(reserve weather)' if zrodlo_pogody == 'rezerwa' else ('(weather unknown)' if zrodlo_pogody == 'nieznane' else '') }}
   # Empty text = all start conditions are met (except the forecast, which is checked separately).
   powod_blokady: >-
     {%- set brak = ['unknown', 'unavailable', 'none', ''] -%}
@@ -498,12 +561,18 @@ variables:
       the mower is not docked (state: {{ states(kosiarka) }})
     {%- elif nastepne > teraz -%}
       too early, next mowing from {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+    {%- elif cisza_nocna != '' and is_state(cisza_nocna, 'on') -%}
+      quiet night
     {%- elif bateria and states(bateria) in brak -%}
       no battery reading
     {%- elif bateria and states(bateria) | float(0) < min_bateria | float(0) -%}
       battery {{ states(bateria) }}%, minimum {{ min_bateria | int }}%
     {%- elif ns.deszcz -%}
       raining
+    {%- elif zrodlo_pogody == 'nieznane' -%}
+      weather unknown, no 24-hour rain reading
+    {%- elif opad_24h_mm | float(0) >= 1 -%}
+      over the last 24 hours {{ opad_24h_mm | float(0) | round(1) }} mm of rain fell, the grass is wet
     {%- elif ns.mokro > 0 -%}
       the grass is drying after rain until {{ ns.mokro | timestamp_custom('%H:%M') }}
     {%- elif temperatura and t is none -%}
@@ -562,11 +631,30 @@ actions:
                     {%- if ns.n == 0 -%}brak
                     {%- elif ns.opad > max_opad_mm | float or ns.p > max_prawdopodobienstwo | float -%}deszcz
                     {%- else -%}ok{%- endif -%}
-              - alias: Without an hourly forecast, start only if there are rain sensors
-                condition: template
-                value_template: >-
-                  {{ ocena_prognozy == 'ok'
-                     or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0) }}
+              - if:
+                  - condition: template
+                    alias: Without an hourly forecast, start only if there are rain sensors
+                    value_template: >-
+                      {{ not (ocena_prognozy == 'ok'
+                              or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0)) }}
+                then:
+                  - variables:
+                      nowy_powod: >-
+                        {%- if ocena_prognozy == 'deszcz' -%}
+                          Not mowing - the forecast shows rain in the next {{ prognoza_godz | int(3) }} h{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                        {%- else -%}
+                          Not mowing - no hourly forecast and no rain sensor{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                        {%- endif -%}
+                  - if:
+                      - condition: template
+                        value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: "{{ pomocnik_powod }}"
+                        data:
+                          value: "{{ nowy_powod[:255] }}"
+                  - stop: The forecast does not allow a start.
           - action: lawn_mower.start_mowing
             target:
               entity_id: !input kosiarka
@@ -589,8 +677,32 @@ actions:
                   tresc: >-
                     The mower did not leave its base after the start command (state: {{ states(kosiarka) }}).
                     Next attempt at the earliest in {{ ponowienie_godz }} h.
+                  nowy_powod: >-
+                    Not mowing - the mower did not leave the dock after the start command{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+              - if:
+                  - condition: template
+                    value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ pomocnik_powod }}"
+                    data:
+                      value: "{{ nowy_powod[:255] }}"
               - sequence: !input akcje_powiadomien
             else:
+              - variables:
+                  nowy_powod: >-
+                    {%- set suchy = 'grass is dry' if zrodlo_pogody != 'brak' else 'conditions met' -%}
+                    Mowing from {{ now().strftime('%H:%M') }} - {{ suchy }}{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+              - if:
+                  - condition: template
+                    value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ pomocnik_powod }}"
+                    data:
+                      value: "{{ nowy_powod[:255] }}"
               - if:
                   - condition: template
                     value_template: "{{ powiadom_o_starcie }}"
@@ -599,6 +711,32 @@ actions:
                       tytul: "{{ nazwa }}: mowing started"
                       tresc: The mower left its base at {{ now().strftime('%H:%M') }}.
                   - sequence: !input akcje_powiadomien
+
+      - alias: Record why the mower does not go out
+        conditions:
+          - condition: trigger
+            id: sprawdz
+          - condition: template
+            value_template: >-
+              {{ pomocnik_powod != ''
+                 and (is_state(kosiarka, 'docked') or zrodlo_pogody in ['rezerwa', 'nieznane']) }}
+        sequence:
+          - variables:
+              nowy_powod: >-
+                {%- if is_state(kosiarka, 'docked') -%}
+                  Not mowing - {{ powod_blokady | trim }}{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                {%- else -%}
+                  Mower outside the dock (state: {{ states(kosiarka) }}){{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                {%- endif -%}
+          - if:
+              - condition: template
+                value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ pomocnik_powod }}"
+                data:
+                  value: "{{ nowy_powod[:255] }}"
 
       - alias: Mowing confirmed - set the next date
         conditions:

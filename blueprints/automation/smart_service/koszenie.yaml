@@ -9,9 +9,15 @@ blueprint:
     - kosiarka stoi w bazie i ma wystarczająco naładowaną baterię,
     - minął ustawiony odstęp od ostatniego koszenia (pomocnik z datą),
     - nie pada, a od ostatniego opadu minął czas schnięcia trawy (opcjonalnie),
+    - w ciągu ostatnich 24 godzin nie spadło co najmniej 1 mm deszczu (opcjonalnie),
+    - nie trwa cisza nocna (opcjonalnie),
     - prognoza godzinowa nie przewiduje deszczu w najbliższych godzinach (opcjonalnie),
     - temperatura jest w dozwolonym zakresie i nie ma rosy (opcjonalnie),
     - żadna blokada nie jest włączona (opcjonalnie).
+
+    Gdy podano czujnik opadu z 24 godzin, a oba źródła (główne i zapas) są
+    niedostępne, pogoda jest nieznana i kosiarka nie wyjeżdża. Powód ostatniej
+    decyzji można zapisywać w pomocniku Tekst.
 
     Domyślnie koszenie nie ma ograniczeń godzin ani dni. W sekcji "Harmonogram"
     i "Bezpieczeństwo" można włączyć: wybrane dni tygodnia, okno godzin,
@@ -70,6 +76,16 @@ blueprint:
             entity:
               filter:
                 - domain: input_datetime
+        pomocnik_powod:
+          name: Pomocnik - powód ostatniej decyzji (opcjonalnie)
+          description: >-
+            Pomocnik Tekst o długości maks. 255 znaków. Zapisuje się w nim, dlaczego kosiarka
+            kosi albo czeka, także gdy działa pogoda zapasowa albo pogoda jest nieznana.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_text
     harmonogram_sekcja:
       name: Harmonogram
       icon: mdi:calendar-clock
@@ -152,10 +168,36 @@ blueprint:
               step: 5
               unit_of_measurement: min
               mode: slider
+        cisza_nocna:
+          name: Cisza nocna (opcjonalnie)
+          description: Przełącznik, harmonogram lub czujnik. Włączony = kosiarka nie wyjeżdża. Kosiarka, która już kosi, kończy pracę.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+                - domain: schedule
+                - domain: binary_sensor
     pogoda_sekcja:
       name: Pogoda
       icon: mdi:weather-partly-rainy
       input:
+        pogoda_opad_24h_wstecz:
+          name: Opad z ostatnich 24 godzin - źródło główne (opcjonalnie)
+          description: Sensor opadu w mm. Gdy podany i dostępny, ma pierwszeństwo. Co najmniej 1 mm = trawa mokra, kosiarka nie wyjeżdża.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        deszcz_24h:
+          name: Opad z 24 godzin - zapas (opcjonalnie)
+          description: Własny sensor opadu w mm, używany, gdy źródło główne jest niedostępne albo nie podano go wcale. Przejście na zapas jest zapisywane w pomocniku powodu.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
         czujniki_deszczu:
           name: Czujniki deszczu (opcjonalnie)
           description: >-
@@ -456,6 +498,27 @@ variables:
   deszcz_do_bazy: !input deszcz_do_bazy
   powiadom_o_starcie: !input powiadom_o_starcie
   nazwa: "{{ state_attr(kosiarka, 'friendly_name') or kosiarka }}"
+  pomocnik_powod: !input pomocnik_powod
+  cisza_nocna: !input cisza_nocna
+  pogoda_opad_24h_wstecz: !input pogoda_opad_24h_wstecz
+  deszcz_24h: !input deszcz_24h
+  # glowne = źródło główne, rezerwa = główne podane, ale niedostępne (działa zapas),
+  # zapas = tylko zapas podany, nieznane = podane źródła niedostępne, brak = nie podano opadu.
+  zrodlo_pogody: >-
+    {%- set glowne = pogoda_opad_24h_wstecz != '' -%}
+    {%- set zapas = deszcz_24h != '' -%}
+    {%- if glowne and states(pogoda_opad_24h_wstecz) | is_number -%}glowne
+    {%- elif zapas and states(deszcz_24h) | is_number -%}{{ 'rezerwa' if glowne else 'zapas' }}
+    {%- elif glowne or zapas -%}nieznane
+    {%- else -%}brak
+    {%- endif -%}
+  opad_24h_mm: >-
+    {%- if zrodlo_pogody == 'glowne' -%}{{ states(pogoda_opad_24h_wstecz) | float(0) }}
+    {%- elif zrodlo_pogody in ['rezerwa', 'zapas'] -%}{{ states(deszcz_24h) | float(0) }}
+    {%- else -%}0
+    {%- endif -%}
+  pogoda_dopisek: >-
+    {{ '(pogoda zapasowa)' if zrodlo_pogody == 'rezerwa' else ('(pogoda nieznana)' if zrodlo_pogody == 'nieznane' else '') }}
   # Pusty tekst = wszystkie warunki startu spełnione (bez prognozy, sprawdzanej osobno).
   powod_blokady: >-
     {%- set brak = ['unknown', 'unavailable', 'none', ''] -%}
@@ -498,12 +561,18 @@ variables:
       kosiarka nie stoi w bazie (stan: {{ states(kosiarka) }})
     {%- elif nastepne > teraz -%}
       za wcześnie, najbliższe koszenie od {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+    {%- elif cisza_nocna != '' and is_state(cisza_nocna, 'on') -%}
+      cisza nocna
     {%- elif bateria and states(bateria) in brak -%}
       brak odczytu baterii
     {%- elif bateria and states(bateria) | float(0) < min_bateria | float(0) -%}
       bateria {{ states(bateria) }}%, minimum {{ min_bateria | int }}%
     {%- elif ns.deszcz -%}
       pada
+    {%- elif zrodlo_pogody == 'nieznane' -%}
+      pogoda nieznana, brak odczytu opadu z 24 godzin
+    {%- elif opad_24h_mm | float(0) >= 1 -%}
+      w ciągu 24 godzin spadło {{ opad_24h_mm | float(0) | round(1) }} mm deszczu, trawa jest mokra
     {%- elif ns.mokro > 0 -%}
       trawa schnie po deszczu do {{ ns.mokro | timestamp_custom('%H:%M') }}
     {%- elif temperatura and t is none -%}
@@ -562,11 +631,30 @@ actions:
                     {%- if ns.n == 0 -%}brak
                     {%- elif ns.opad > max_opad_mm | float or ns.p > max_prawdopodobienstwo | float -%}deszcz
                     {%- else -%}ok{%- endif -%}
-              - alias: Bez prognozy godzinowej start tylko, gdy są czujniki deszczu
-                condition: template
-                value_template: >-
-                  {{ ocena_prognozy == 'ok'
-                     or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0) }}
+              - if:
+                  - condition: template
+                    alias: Bez prognozy godzinowej start tylko, gdy są czujniki deszczu
+                    value_template: >-
+                      {{ not (ocena_prognozy == 'ok'
+                              or (ocena_prognozy == 'brak' and czujniki_deszczu | length > 0)) }}
+                then:
+                  - variables:
+                      nowy_powod: >-
+                        {%- if ocena_prognozy == 'deszcz' -%}
+                          Nie koszę - prognoza przewiduje deszcz w najbliższych {{ prognoza_godz | int(3) }} h{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                        {%- else -%}
+                          Nie koszę - brak prognozy godzinowej i czujnika deszczu{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                        {%- endif -%}
+                  - if:
+                      - condition: template
+                        value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: "{{ pomocnik_powod }}"
+                        data:
+                          value: "{{ nowy_powod[:255] }}"
+                  - stop: Prognoza nie pozwala na start.
           - action: lawn_mower.start_mowing
             target:
               entity_id: !input kosiarka
@@ -589,8 +677,32 @@ actions:
                   tresc: >-
                     Kosiarka nie wyjechała z bazy po komendzie startu (stan: {{ states(kosiarka) }}).
                     Następna próba najwcześniej za {{ ponowienie_godz }} h.
+                  nowy_powod: >-
+                    Nie koszę - kosiarka nie wyjechała z bazy po komendzie startu{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+              - if:
+                  - condition: template
+                    value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ pomocnik_powod }}"
+                    data:
+                      value: "{{ nowy_powod[:255] }}"
               - sequence: !input akcje_powiadomien
             else:
+              - variables:
+                  nowy_powod: >-
+                    {%- set suchy = 'trawa sucha' if zrodlo_pogody != 'brak' else 'warunki spełnione' -%}
+                    Koszę od {{ now().strftime('%H:%M') }} - {{ suchy }}{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+              - if:
+                  - condition: template
+                    value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ pomocnik_powod }}"
+                    data:
+                      value: "{{ nowy_powod[:255] }}"
               - if:
                   - condition: template
                     value_template: "{{ powiadom_o_starcie }}"
@@ -599,6 +711,32 @@ actions:
                       tytul: "{{ nazwa }}: koszenie rozpoczęte"
                       tresc: Kosiarka wyjechała z bazy {{ now().strftime('%H:%M') }}.
                   - sequence: !input akcje_powiadomien
+
+      - alias: Zapisz powód, dla którego kosiarka nie wyjeżdża
+        conditions:
+          - condition: trigger
+            id: sprawdz
+          - condition: template
+            value_template: >-
+              {{ pomocnik_powod != ''
+                 and (is_state(kosiarka, 'docked') or zrodlo_pogody in ['rezerwa', 'nieznane']) }}
+        sequence:
+          - variables:
+              nowy_powod: >-
+                {%- if is_state(kosiarka, 'docked') -%}
+                  Nie koszę - {{ powod_blokady | trim }}{{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                {%- else -%}
+                  Kosiarka poza bazą (stan: {{ states(kosiarka) }}){{ ' ' ~ pogoda_dopisek if pogoda_dopisek else '' }}
+                {%- endif -%}
+          - if:
+              - condition: template
+                value_template: "{{ pomocnik_powod != '' and states(pomocnik_powod) != nowy_powod[:255] }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ pomocnik_powod }}"
+                data:
+                  value: "{{ nowy_powod[:255] }}"
 
       - alias: Koszenie potwierdzone - wyznacz następny termin
         conditions:

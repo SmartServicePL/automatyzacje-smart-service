@@ -17,7 +17,7 @@
       "id": "koszenie-uniwersalne",
       "kategoria": "ogrod",
       "nazwa": "Automatyczne koszenie – każda kosiarka",
-      "wersja": "1.0.0",
+      "wersja": "1.1.0",
       "min_ha": "2024.10.0",
       "krotki_opis": "Kosiarka rusza sama, gdy jest sucho, ciepło i minął odstęp od ostatniego koszenia. Deszcz odsyła ją do bazy.",
       "opis": [
@@ -44,7 +44,7 @@
       "id": "koszenie-worx",
       "kategoria": "ogrod",
       "nazwa": "Worx Vision / RTK – inteligentny harmonogram koszenia",
-      "wersja": "0.8.0",
+      "wersja": "0.11.0",
       "min_ha": "2025.4.0",
       "krotki_opis": "Liczy przyrost trawy i wybiera najlepszą godzinę z prognozy. Najpierw krawędzie, potem ładowanie, potem koszenie.",
       "opis": [
