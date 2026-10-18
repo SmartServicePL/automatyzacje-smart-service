@@ -1,6 +1,6 @@
 {
   "wersja_schematu": 1,
-  "aktualizacja": "2026-10-17",
+  "aktualizacja": "2026-10-18",
   "nazwa": "Automatyzacje Smart Service",
   "kategorie": [
     {
@@ -192,6 +192,62 @@
       "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Falarm_czujniki.yaml",
       "licencja": "MIT",
       "ikona": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/ikony/alarm_czujniki.png"
+    },
+    {
+      "id": "oswietlenie-wewnetrzne",
+      "kategoria": "dom",
+      "nazwa": "Oświetlenie wewnętrzne",
+      "wersja": "1.0.0",
+      "min_ha": "2025.4.0",
+      "krotki_opis": "Światło w pomieszczeniu zapala się przy obecności, gdy jest ciemno, i gaśnie, gdy nikogo nie ma.",
+      "opis": [
+        "Jedna automatyzacja na pomieszczenie: czujnik obecności, lampy (light i switch), opcjonalnie czujnik jasności.",
+        "Czas gaszenia sam się wydłuża, gdy ktoś wraca zaraz po zgaszeniu; lampy ze ściemnianiem przygasają 15 s przed zgaszeniem.",
+        "Ręczne zgaszenie wygrywa do końca obecności, ręcznie zapalone światło świeci co najmniej 30 minut; tryb „Tylko gaś”.",
+        "Noc według ciszy nocnej: wybrane lampy na niskiej jasności albo bez zapalania; opcjonalnie tylko, gdy ktoś jest w domu."
+      ],
+      "wymagania": [
+        "Home Assistant 2025.4 lub nowszy",
+        "Czujnik ruchu, zajętości albo obecności (binary_sensor)",
+        "Lampy light albo przełączniki switch",
+        "Bez pomocników"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/oswietlenie_wewnetrzne.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/docs/oswietlenie-wewnetrzne.md",
+      "zrzut": "",
+      "repozytorium": "https://github.com/SmartServicePL/automatyzacje-smart-service",
+      "linki_dodatkowe": [],
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Foswietlenie_wewnetrzne.yaml",
+      "licencja": "MIT",
+      "ikona": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/ikony/oswietlenie_wewnetrzne.png"
+    },
+    {
+      "id": "oswietlenie-zewnetrzne",
+      "kategoria": "dom",
+      "nazwa": "Oświetlenie zewnętrzne",
+      "wersja": "1.0.0",
+      "min_ha": "2025.4.0",
+      "krotki_opis": "Lampy przed domem i w ogrodzie od zmierzchu do godziny albo do świtu, przy ruchu i przy alarmie.",
+      "opis": [
+        "Od zmierzchu do ustawionej godziny, od zmierzchu do świtu albo tylko przy ruchu; zmierzch i świt z położenia słońca.",
+        "Czujniki ruchu po zmierzchu: pełne światło przez ustawiony czas po ostatnim ruchu, także w ciszy nocnej.",
+        "Opcjonalnie: w ciszy nocnej tylko przy ruchu, przy alarmie włamania wszystkie lampy na 100 %.",
+        "Bez pogody i bez pomocników."
+      ],
+      "wymagania": [
+        "Home Assistant 2025.4 lub nowszy",
+        "Lampy light albo przełączniki switch",
+        "Opcjonalnie: czujniki ruchu, przełącznik ciszy nocnej, centrala alarmu",
+        "Bez pomocników"
+      ],
+      "blueprint_url": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/oswietlenie_zewnetrzne.yaml",
+      "dokumentacja": "https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/docs/oswietlenie-zewnetrzne.md",
+      "zrzut": "",
+      "repozytorium": "https://github.com/SmartServicePL/automatyzacje-smart-service",
+      "linki_dodatkowe": [],
+      "import_url": "https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FSmartServicePL%2Fautomatyzacje-smart-service%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsmart_service%2Foswietlenie_zewnetrzne.yaml",
+      "licencja": "MIT",
+      "ikona": "https://raw.githubusercontent.com/SmartServicePL/automatyzacje-smart-service/main/assets/ikony/oswietlenie_zewnetrzne.png"
     }
   ]
 }

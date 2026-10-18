@@ -1,0 +1,331 @@
+blueprint:
+  name: Smart Service - Außenbeleuchtung
+  description: |
+    Lampen vor dem Haus und im Garten nach Dämmerung, Uhrzeit und Bewegung.
+
+    Wann es leuchtet: von der Dämmerung bis zur eingestellten Uhrzeit, von der Abend- bis zur Morgendämmerung oder nur
+    bei Bewegung. Abend- und Morgendämmerung werden aus dem Sonnenstand berechnet.
+    Bewegungssensoren (optional) wirken nur nach der Dämmerung: volles Licht für
+    die eingestellte Zeit nach der letzten Bewegung, auch während der Nachtruhe.
+    Optional: während der Nachtruhe nur bei Bewegung, und bei Einbruchalarm alle
+    Lampen auf 100 %. Nach dem Alarm kehren die Lampen zum Zustand des Zeitplans zurück.
+
+    Dimmbare Lampen leuchten bei Bewegung und Alarm mit 100 %. Das Wetter hat keinen Einfluss.
+    Keine Helfer nötig.
+  domain: automation
+  author: Smart Service
+  homeassistant:
+    min_version: "2025.4.0"
+  source_url: https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/oswietlenie_zewnetrzne_de.yaml
+  input:
+    lampy_sekcja:
+      name: Lampen und Zeitplan
+      icon: mdi:outdoor-lamp
+      input:
+        lampy:
+          name: Lampen
+          description: Außenlichter und Lichtschalter.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain:
+                    - light
+                    - switch
+        kiedy_swieci:
+          name: Wann es leuchtet
+          default: do_godziny
+          selector:
+            select:
+              mode: list
+              options:
+                - value: do_godziny
+                  label: Von der Dämmerung bis zur Uhrzeit
+                - value: do_switu
+                  label: Von der Abend- bis zur Morgendämmerung
+                - value: tylko_ruch
+                  label: Nur bei Bewegung
+        godzina_gaszenia:
+          name: Ausschaltzeit
+          description: Nur bei "Von der Dämmerung bis zur Uhrzeit". Eine Uhrzeit nach Mitternacht (z. B. 01:00) = Ausschalten in der Nacht.
+          default: "23:00:00"
+          selector:
+            time: {}
+    ruch_sekcja:
+      name: Bewegung
+      icon: mdi:motion-sensor
+      input:
+        czujniki_ruchu:
+          name: Bewegungssensoren außen (optional)
+          description: Wirken nur nach der Dämmerung. Außensensoren reagieren auch auf Tiere und bewegte Äste.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - motion
+                    - occupancy
+                    - presence
+        czas_ruchu_min:
+          name: Volles Licht nach der letzten Bewegung
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 15
+              step: 1
+              unit_of_measurement: min
+              mode: slider
+    noc_sekcja:
+      name: Nacht
+      icon: mdi:weather-night
+      input:
+        w_ciszy_tylko_ruch:
+          name: Während der Nachtruhe nur bei Bewegung
+          description: Während der Nachtruhe sind die Lampen aus und nur Bewegung schaltet sie ein.
+          default: false
+          selector:
+            boolean: {}
+        cisza_nocna:
+          name: Nachtruhe
+          description: Nachtruhe-Schalter (an = Nacht). Leer = keine Nachtruhe.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+    alarm_sekcja:
+      name: Alarm
+      icon: mdi:shield-home
+      input:
+        przy_alarmie_wszystko:
+          name: Bei Einbruchalarm alles einschalten
+          description: Bei Alarm alle Lampen auf 100 %, auch tagsüber. Nach dem Alarm zurück zum Zustand des Zeitplans.
+          default: false
+          selector:
+            boolean: {}
+        alarm:
+          name: Alarmzentrale
+          description: Eine alarm_control_panel-Entität. Leer = keine Alarmkopplung.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: alarm_control_panel
+    zaawansowane_sekcja:
+      name: Erweitert
+      icon: mdi:weather-sunset-down
+      collapsed: true
+      input:
+        zmierzch_elewacja:
+          name: Dämmerung bei Sonnenhöhe
+          description: Die Lampen gehen an, wenn die Sonne unter diese Höhe sinkt, und morgens aus, wenn sie sie überschreitet. -2° = Hälfte der bürgerlichen Dämmerung.
+          default: -2
+          selector:
+            number:
+              min: -10
+              max: 5
+              step: 0.5
+              unit_of_measurement: "°"
+              mode: box
+
+mode: restart
+max_exceeded: silent
+trace:
+  stored_traces: 20
+
+trigger_variables:
+  zmierzch_tv: !input zmierzch_elewacja
+  cisza_tv: !input cisza_nocna
+  alarm_tv: !input alarm
+
+triggers:
+  - trigger: template
+    value_template: "{{ state_attr('sun.sun', 'elevation') | float(90) < zmierzch_tv | float(-2) }}"
+    id: zmierzch
+  - trigger: template
+    value_template: "{{ state_attr('sun.sun', 'elevation') | float(-90) >= zmierzch_tv | float(-2) }}"
+    id: swit
+  - trigger: time
+    at: !input godzina_gaszenia
+    id: godzina
+  - trigger: template
+    value_template: "{{ cisza_tv != '' and is_state(cisza_tv, 'on') }}"
+    id: cisza
+  - trigger: template
+    value_template: "{{ cisza_tv != '' and is_state(cisza_tv, 'off') }}"
+    id: cisza
+  - trigger: state
+    entity_id: !input czujniki_ruchu
+    to: "on"
+    id: ruch
+  - trigger: state
+    entity_id: !input czujniki_ruchu
+    to: "off"
+    for:
+      minutes: !input czas_ruchu_min
+    id: ruch_koniec
+  - trigger: template
+    value_template: "{{ alarm_tv != '' and is_state(alarm_tv, 'triggered') }}"
+    id: alarm
+  - trigger: template
+    value_template: "{{ alarm_tv != '' and not is_state(alarm_tv, 'triggered') }}"
+    id: alarm_koniec
+  - trigger: homeassistant
+    event: start
+    id: start
+  - trigger: event
+    event_type: automation_reloaded
+    id: start
+
+variables:
+  lampy_wej: !input lampy
+  kiedy_swieci: !input kiedy_swieci
+  godzina_gaszenia: !input godzina_gaszenia
+  zmierzch_elewacja: !input zmierzch_elewacja
+  czujniki_wej: !input czujniki_ruchu
+  czas_ruchu_min: !input czas_ruchu_min
+  w_ciszy_tylko_ruch: !input w_ciszy_tylko_ruch
+  cisza_nocna: !input cisza_nocna
+  alarm: !input alarm
+  przy_alarmie_wszystko: !input przy_alarmie_wszystko
+  limit_petli: 20
+  lampy: "{{ lampy_wej if lampy_wej is list else [lampy_wej] }}"
+  czujniki: "{{ czujniki_wej if czujniki_wej is list else ([czujniki_wej] if czujniki_wej else []) }}"
+  po_zmierzchu: "{{ state_attr('sun.sun', 'elevation') | float(90) < zmierzch_elewacja | float(-2) }}"
+
+conditions:
+  - alias: Bewegung am Tag ändert nichts
+    condition: template
+    value_template: "{{ trigger.id not in ['ruch', 'ruch_koniec'] or po_zmierzchu }}"
+
+actions:
+  - alias: Lampenzustand nach Alarm, Bewegung und Zeitplan
+    repeat:
+      until:
+        - condition: template
+          value_template: "{{ not czekaj_na_koniec_ruchu or repeat.index >= limit_petli }}"
+      sequence:
+        - variables:
+            teraz: "{{ now().timestamp() }}"
+            ciemno: "{{ state_attr('sun.sun', 'elevation') | float(90) < zmierzch_elewacja | float(-2) }}"
+            noc: "{{ cisza_nocna != '' and is_state(cisza_nocna, 'on') }}"
+            w_oknie: >-
+              {%- set g = (godzina_gaszenia | string).split(':') -%}
+              {%- set koniec = (g[0] | int(23)) * 60 + (g[1] | int(0) if g | count > 1 else 0) -%}
+              {%- set t = now().hour * 60 + now().minute -%}
+              {%- if koniec >= 720 -%}{{ 720 <= t < koniec }}
+              {%- else -%}{{ t >= 720 or t < koniec }}
+              {%- endif -%}
+            harmonogram: >-
+              {%- if not ciemno or kiedy_swieci == 'tylko_ruch' or (noc and w_ciszy_tylko_ruch) -%}{{ false }}
+              {%- elif kiedy_swieci == 'do_switu' -%}{{ true }}
+              {%- else -%}{{ w_oknie }}
+              {%- endif -%}
+            alarm_trwa: "{{ przy_alarmie_wszystko and alarm != '' and is_state(alarm, 'triggered') }}"
+            ruch_trwa: "{{ czujniki | select('is_state', 'on') | list | count > 0 }}"
+            # Ende der letzten Bewegung: der späteste Wechsel eines Sensors zu "keine Bewegung". Nach einem Systemstart nicht gezählt.
+            ostatni_ruch_ts: >-
+              {%- set ns = namespace(t=0) -%}
+              {%- if trigger.id != 'start' or not repeat.first -%}
+                {%- for e in czujniki if is_state(e, 'off') -%}
+                  {%- set ns.t = [ns.t, states[e].last_changed.timestamp()] | max -%}
+                {%- endfor -%}
+              {%- endif -%}
+              {{ ns.t }}
+            ruch_pozostalo_s: "{{ ostatni_ruch_ts + (czas_ruchu_min | float(3)) * 60 - teraz }}"
+            pelne: "{{ alarm_trwa or (ciemno and (ruch_trwa or ruch_pozostalo_s > 0)) }}"
+            czekaj_na_koniec_ruchu: "{{ not alarm_trwa and ciemno and not ruch_trwa and ruch_pozostalo_s > 0 }}"
+            przelaczniki: "{{ lampy | select('match', 'switch\\.') | list }}"
+            sciemniane: >-
+              {%- set ns = namespace(l=[]) -%}
+              {%- for e in lampy if e.startswith('light.') -%}
+                {%- if (state_attr(e, 'supported_color_modes') or []) | reject('in', ['onoff', 'unknown']) | list | count > 0 -%}
+                  {%- set ns.l = ns.l + [e] -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ ns.l }}
+            zwykle: "{{ lampy | select('match', 'light\\.') | reject('in', sciemniane) | list }}"
+        - choose:
+            - alias: Bewegung nach der Dämmerung oder Alarm - volles Licht
+              conditions:
+                - condition: template
+                  value_template: "{{ pelne }}"
+              sequence:
+                - variables:
+                    do_rozjasnienia: >-
+                      {{ sciemniane | reject('is_state_attr', 'brightness', 255) | list }}
+                - if:
+                    - condition: template
+                      value_template: "{{ do_rozjasnienia | count > 0 }}"
+                  then:
+                    - action: light.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ do_rozjasnienia }}"
+                      data:
+                        brightness_pct: 100
+                - if:
+                    - condition: template
+                      value_template: "{{ zwykle | reject('is_state', 'on') | list | count > 0 }}"
+                  then:
+                    - action: light.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ zwykle | reject('is_state', 'on') | list }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ przelaczniki | reject('is_state', 'on') | list | count > 0 }}"
+                  then:
+                    - action: switch.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ przelaczniki | reject('is_state', 'on') | list }}"
+            - alias: Zeitplan - Lampen an
+              conditions:
+                - condition: template
+                  value_template: "{{ harmonogram }}"
+              sequence:
+                - if:
+                    - condition: template
+                      value_template: "{{ lampy | select('match', 'light\\.') | reject('is_state', 'on') | list | count > 0 }}"
+                  then:
+                    - action: light.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ lampy | select('match', 'light\\.') | reject('is_state', 'on') | list }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ przelaczniki | reject('is_state', 'on') | list | count > 0 }}"
+                  then:
+                    - action: switch.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ przelaczniki | reject('is_state', 'on') | list }}"
+          default:
+            - alias: Lampen aus
+              if:
+                - condition: template
+                  value_template: "{{ lampy | select('match', 'light\\.') | select('is_state', 'on') | list | count > 0 }}"
+              then:
+                - action: light.turn_off
+                  continue_on_error: true
+                  target:
+                    entity_id: "{{ lampy | select('match', 'light\\.') | select('is_state', 'on') | list }}"
+            - if:
+                - condition: template
+                  value_template: "{{ przelaczniki | select('is_state', 'on') | list | count > 0 }}"
+              then:
+                - action: switch.turn_off
+                  continue_on_error: true
+                  target:
+                    entity_id: "{{ przelaczniki | select('is_state', 'on') | list }}"
+        - alias: Nach der letzten Bewegung - Warten bis zum Ende des vollen Lichts
+          if:
+            - condition: template
+              value_template: "{{ czekaj_na_koniec_ruchu }}"
+          then:
+            - delay:
+                seconds: "{{ [ruch_pozostalo_s | float(0), 1] | max }}"

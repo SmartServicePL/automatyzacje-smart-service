@@ -6,6 +6,11 @@
   - Kuweta: gdy robot w trakcie szybkiego sprzątania stanie z kodem błędu, po powrocie do stacji wynik to „Kuweta: przerwane - usterka”, a nie „obszar posprzątany”. Licznik użyć się nie zeruje, kolejna próba najwcześniej po godzinie.
 - **Inteligentny robot sprzątający – każda marka** 1.1.1. Wejścia bez zmian.
   - Tryb podglądu: decyzja o sprzątaniu przy kuwecie jest zapisywana raz (z godziną) i licznik kuwety się zeruje, tak jak po prawdziwym sprzątaniu. Wcześniej ten sam komunikat wracał co 5 minut na zmianę z „Czekam”.
+- Nowe pozycje **Oświetlenie wewnętrzne** 1.0.0 (`oswietlenie_wewnetrzne.yaml`, wersje `_en` i `_de`, jedna automatyzacja na pomieszczenie) i **Oświetlenie zewnętrzne** 1.0.0 (`oswietlenie_zewnetrzne.yaml`, wersje `_en` i `_de`). Obie bez pomocników i bez pogody.
+  - Wewnętrzne: zapalanie przy obecności, gdy jest ciemno (czujnik jasności sprawdzany tylko przy zgaszonych lampach, poniżej połowy progu od razu, bliżej progu po 2 minutach; bez czujnika od zachodu słońca), gaszenie po ustawionym czasie bez obecności, który podwaja się przy powrocie najpóźniej minutę po zgaszeniu (do limitu). Lampy ze ściemnianiem (według `supported_color_modes`) przygasają do połowy 15 s przed zgaszeniem, obecność przywraca jasność; przełączniki nigdy nie przygasają. Ręczne zgaszenie wygrywa do końca obecności, ręcznie zapalone światło świeci co najmniej 30 minut (rozpoznanie po kontekście zmiany lampy). Tryb „Tylko gaś”, noc według ciszy nocnej (lampy nocne na ustawionej jasności albo „Nocą nie zapalaj”), opcja „Zapalaj tylko, gdy ktoś jest w domu”.
+  - Zewnętrzne: od zmierzchu do godziny, od zmierzchu do świtu albo tylko przy ruchu (zmierzch i świt z wysokości słońca, −2°). Ruch tylko po zmierzchu: pełne światło przez ustawiony czas po ostatnim ruchu, także w ciszy nocnej. Opcjonalnie w ciszy nocnej tylko przy ruchu i wszystkie lampy na 100 % przy alarmie włamania, potem powrót do stanu z harmonogramu.
+  - Zrzuty formularzy zostaną dodane później.
+- Generator tłumaczeń: dwa nowe blueprinty w `PAIRS`.
 
 ## 2026-10-17 (4)
 

@@ -50,6 +50,8 @@ PAIRS = (
     (BLUEPRINTS / "roboty_sprzatajace.yaml", ROOT / "i18n" / "roboty_sprzatajace.yaml"),
     (BLUEPRINTS / "roboty_inteligentne.yaml", ROOT / "i18n" / "roboty_inteligentne.yaml"),
     (BLUEPRINTS / "alarm_czujniki.yaml", ROOT / "i18n" / "alarm_czujniki.yaml"),
+    (BLUEPRINTS / "oswietlenie_wewnetrzne.yaml", ROOT / "i18n" / "oswietlenie_wewnetrzne.yaml"),
+    (BLUEPRINTS / "oswietlenie_zewnetrzne.yaml", ROOT / "i18n" / "oswietlenie_zewnetrzne.yaml"),
 )
 
 POLISH_LETTERS = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")

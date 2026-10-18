@@ -1,0 +1,670 @@
+blueprint:
+  name: Smart Service - indoor lighting
+  description: |
+    Presence-controlled light in a room. One automation = one room.
+
+    Turns the lamps on when the sensor detects presence and the room is dark. Turns them off
+    when there is no presence for the set time. When someone returns at most a minute after switch-off,
+    the switch-off time doubles (up to a limit), because sensors lose people who sit still.
+    Dark: by the illuminance sensor in the room, checked only while the lamps
+    are off, and without a sensor from sunset.
+
+    Dimmable lamps dim to half 15 seconds before switch-off, and presence
+    during that time restores the brightness. Switches (switch) do not dim.
+    Switching off by hand wins until the presence ends. Light switched on by hand stays on
+    for at least 30 minutes.
+
+    Night by the quiet night switch: selected lamps at low brightness or
+    no switching on (bedroom). Optional: switch on only when someone is at home.
+    No helpers needed.
+  domain: automation
+  author: Smart Service
+  homeassistant:
+    min_version: "2025.4.0"
+  source_url: https://github.com/SmartServicePL/automatyzacje-smart-service/blob/main/blueprints/automation/smart_service/oswietlenie_wewnetrzne_en.yaml
+  input:
+    pomieszczenie_sekcja:
+      name: Room
+      icon: mdi:lightbulb-auto
+      input:
+        czujnik_ruchu:
+          name: Presence sensor
+          description: Motion, occupancy or presence sensor in this room.
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - motion
+                    - occupancy
+                    - presence
+        lampy:
+          name: Lamps
+          description: Lights and lighting switches in this room.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain:
+                    - light
+                    - switch
+        tryb:
+          name: Mode
+          description: In "Switch off only" mode a person switches the light on and the automation only switches it off.
+          default: zapalaj_i_gas
+          selector:
+            select:
+              mode: list
+              options:
+                - value: zapalaj_i_gas
+                  label: Switch on and off
+                - value: tylko_gas
+                  label: Switch off only
+    gaszenie_sekcja:
+      name: Switching off
+      icon: mdi:timer-outline
+      input:
+        gas_po_min:
+          name: Switch off after no presence for
+          description: Doubles when someone returns at most a minute after switch-off, up to the limit below.
+          default: 2
+          selector:
+            number:
+              min: 1
+              max: 30
+              step: 1
+              unit_of_measurement: min
+              mode: slider
+        gas_po_max_min:
+          name: Longest switch-off time after a return
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 60
+              step: 1
+              unit_of_measurement: min
+              mode: box
+    jasnosc_sekcja:
+      name: Dark
+      icon: mdi:brightness-6
+      collapsed: true
+      input:
+        czujnik_lx:
+          name: Illuminance sensor (optional)
+          description: Illuminance sensor in this room. Empty = dark from sunset.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: illuminance
+        prog_lx:
+          name: Dark below
+          description: >-
+            Checked only while the lamps are off. Below half the threshold dark at once,
+            closer to the threshold only after 2 minutes.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 500
+              step: 1
+              unit_of_measurement: lx
+              mode: box
+    noc_sekcja:
+      name: Night
+      icon: mdi:weather-night
+      input:
+        cisza_nocna:
+          name: Quiet night
+          description: Quiet night switch (on = night). Empty = no night mode.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+        lampy_nocne:
+          name: Lamps at night
+          description: Lamps switched on during quiet night. Empty = all lamps of the room.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain:
+                    - light
+                    - switch
+        jasnosc_nocna:
+          name: Brightness at night
+          description: Dimmable lamps only. Switches and lamps without dimming give full light at night.
+          default: 5
+          selector:
+            number:
+              min: 1
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+        noca_nie_zapalaj:
+          name: Do not switch on at night
+          description: During quiet night the automation does not switch the light on, it only switches it off (e.g. bedroom).
+          default: false
+          selector:
+            boolean: {}
+    dom_sekcja:
+      name: Empty home
+      icon: mdi:home-account
+      collapsed: true
+      input:
+        tylko_gdy_ktos_w_domu:
+          name: Switch on only when someone is at home
+          description: >-
+            When all selected household members are away, the light does not switch on. Switching off works as usual.
+            Household members without a phone in Home Assistant (e.g. children, guests) will not switch the light on then.
+          default: false
+          selector:
+            boolean: {}
+        osoby:
+          name: Household members
+          description: People with a phone and location. Empty = the condition is off.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: person
+
+mode: single
+max_exceeded: silent
+trace:
+  stored_traces: 20
+
+trigger_variables:
+  lampy_tv: !input lampy
+  lampy_nocne_tv: !input lampy_nocne
+  ruch_tv: !input czujnik_ruchu
+  lx_tv: !input czujnik_lx
+  prog_tv: !input prog_lx
+
+triggers:
+  - trigger: state
+    entity_id: !input czujnik_ruchu
+    to: "on"
+    id: ruch
+  - trigger: state
+    entity_id: !input czujnik_ruchu
+    from: "on"
+    id: brak_ruchu
+  - trigger: state
+    entity_id: !input lampy
+    to:
+      - "on"
+      - "off"
+    id: lampa
+  - trigger: state
+    entity_id: !input lampy_nocne
+    to:
+      - "on"
+      - "off"
+    id: lampa
+  - trigger: template
+    value_template: "{{ lx_tv != '' and is_number(states(lx_tv)) and states(lx_tv) | float < prog_tv | float(10) }}"
+    for:
+      minutes: 2
+    id: ciemno
+  - trigger: state
+    entity_id: sun.sun
+    to: below_horizon
+    id: zmierzch
+  - trigger: homeassistant
+    event: start
+    id: start
+  - trigger: event
+    event_type: automation_reloaded
+    id: start
+  # Watchdog: lamps are on without presence and no session watches them (e.g. after an interrupted run).
+  - trigger: template
+    value_template: >-
+      {{ now().minute % 10 == 5 and not is_state(ruch_tv, 'on')
+         and ((lampy_tv if lampy_tv is list else [lampy_tv]) + (lampy_nocne_tv if lampy_nocne_tv is list else [lampy_nocne_tv]))
+             | select('is_state', 'on') | list | count > 0 }}
+    id: straz
+
+variables:
+  czujnik_ruchu: !input czujnik_ruchu
+  lampy_wej: !input lampy
+  tryb: !input tryb
+  gas_po_min: !input gas_po_min
+  gas_po_max_min: !input gas_po_max_min
+  czujnik_lx: !input czujnik_lx
+  prog_lx: !input prog_lx
+  lampy_nocne_wej: !input lampy_nocne
+  jasnosc_nocna: !input jasnosc_nocna
+  noca_nie_zapalaj: !input noca_nie_zapalaj
+  cisza_nocna: !input cisza_nocna
+  tylko_gdy_ktos_w_domu: !input tylko_gdy_ktos_w_domu
+  osoby_wej: !input osoby
+  # Fixed rules (no inputs).
+  przygaszanie_s: 15
+  powrot_s: 60
+  zwloka_ciemno_s: 120
+  reczne_min_s: 1800
+  prog_przygaszania_proc: 10
+  limit_petli: 500
+  lampy: "{{ lampy_wej if lampy_wej is list else [lampy_wej] }}"
+  lampy_nocne: "{{ lampy_nocne_wej if lampy_nocne_wej is list else ([lampy_nocne_wej] if lampy_nocne_wej else []) }}"
+  osoby: "{{ osoby_wej if osoby_wej is list else ([osoby_wej] if osoby_wej else []) }}"
+  wszystkie_lampy: "{{ (lampy + lampy_nocne) | unique | list }}"
+  wlaczone_teraz: "{{ wszystkie_lampy | select('is_state', 'on') | list }}"
+  # Context of the previous run of this automation: a lamp change with this context comes from the automation.
+  kontekst_poprzedni: "{{ this.context.id if this is mapping and this.context is mapping else '' }}"
+  ruch_teraz: "{{ is_state(czujnik_ruchu, 'on') }}"
+
+conditions:
+  - condition: template
+    value_template: >-
+      {%- if trigger.id == 'ruch' -%}{{ true }}
+      {%- elif trigger.id == 'lampa' -%}
+        {{ trigger.from_state is not none and trigger.from_state.state in ['on', 'off']
+           and trigger.to_state.context.id != kontekst_poprzedni }}
+      {%- elif trigger.id in ['ciemno', 'zmierzch'] -%}
+        {{ ruch_teraz and tryb == 'zapalaj_i_gas' and wlaczone_teraz | count == 0 }}
+      {%- else -%}{{ wlaczone_teraz | count > 0 }}
+      {%- endif -%}
+
+actions:
+  - alias: Session state at the start of the run
+    variables:
+      start_ts: "{{ now().timestamp() }}"
+      opoznienie_s: "{{ (gas_po_min | float(2) * 60) | int }}"
+      maks_opoznienie_s: "{{ ([gas_po_min | float(2), gas_po_max_min | float(10)] | max * 60) | int }}"
+      ostatnia: >-
+        {%- set ns = namespace(e='', t=0) -%}
+        {%- for e in wszystkie_lampy -%}
+          {%- set s = states[e] -%}
+          {%- if s is not none and s.last_changed.timestamp() > ns.t -%}
+            {%- set ns.e = e -%}
+            {%- set ns.t = s.last_changed.timestamp() -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {{ ns.e }}
+      ostatnia_wlasna: "{{ ostatnia != '' and states[ostatnia].context.id == kontekst_poprzedni }}"
+      ostatnia_ts: "{{ states[ostatnia].last_changed.timestamp() if ostatnia != '' else 0 }}"
+      # Switched on by hand: the lamp is on and the last change does not come from the automation.
+      # After a start and after saving the automation the context of the previous run is lost: then only switching on by a user counts as manual.
+      reczne_zapalenie_ts: >-
+        {%- if trigger.id == 'lampa' and trigger.to_state.state == 'on' -%}{{ now().timestamp() }}
+        {%- elif wlaczone_teraz | count > 0 and ostatnia != '' and not ostatnia_wlasna
+             and (trigger.id != 'start' or states[ostatnia].context.user_id is not none) -%}{{ ostatnia_ts }}
+        {%- else -%}{{ 0 }}
+        {%- endif -%}
+      # Switched off by hand during presence: wins until it ends. A switch-off while the lamps are on is seen by the running session.
+      reczne_zgaszenie: "{{ trigger.id == 'lampa' and trigger.to_state.state == 'off' }}"
+      # Lamps switched off by the automation a moment ago: a return within a minute lengthens the switch-off time.
+      zgaszone_ts: >-
+        {{ ostatnia_ts if wlaczone_teraz | count == 0 and ostatnia_wlasna and start_ts - ostatnia_ts <= powrot_s else 0 }}
+      ponizej_od: 0
+      przygaszone: {}
+      koniec: false
+
+  - alias: Quick return after switch-off - longer switch-off time
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'ruch' and zgaszone_ts > 0 }}"
+    then:
+      - variables:
+          opoznienie_s: "{{ [opoznienie_s * 2, maks_opoznienie_s] | min }}"
+
+  - alias: Room session - until the presence ends
+    repeat:
+      until:
+        - condition: template
+          value_template: "{{ koniec or repeat.index >= limit_petli }}"
+      sequence:
+        - variables:
+            teraz: "{{ now().timestamp() }}"
+            ruch_jest: "{{ is_state(czujnik_ruchu, 'on') }}"
+            ruch_od: "{{ states[czujnik_ruchu].last_changed.timestamp() if states[czujnik_ruchu] is not none else start_ts }}"
+            wlaczone: "{{ wszystkie_lampy | select('is_state', 'on') | list }}"
+            noc: "{{ cisza_nocna != '' and is_state(cisza_nocna, 'on') }}"
+            ktos_w_domu: >-
+              {{ not tylko_gdy_ktos_w_domu or osoby | count == 0
+                 or osoby | select('is_state', ['home', 'unknown', 'unavailable']) | list | count > 0 }}
+            lx: "{{ states(czujnik_lx) | float(none) if czujnik_lx != '' else none }}"
+            ponizej_od: >-
+              {%- if lx is number and lx < prog_lx | float(10) -%}
+                {{ ponizej_od if ponizej_od > 0 else states[czujnik_lx].last_changed.timestamp() }}
+              {%- else -%}{{ 0 }}
+              {%- endif -%}
+            ciemno: >-
+              {%- if wlaczone | count > 0 -%}nie_dotyczy
+              {%- elif zgaszone_ts > 0 and teraz - zgaszone_ts <= powrot_s -%}ciemno
+              {%- elif trigger.id == 'ciemno' and repeat.first -%}ciemno
+              {%- elif lx is number -%}
+                {%- if lx >= prog_lx | float(10) -%}jasno
+                {%- elif lx < prog_lx | float(10) / 2 or teraz - ponizej_od >= zwloka_ciemno_s -%}ciemno
+                {%- else -%}czekaj
+                {%- endif -%}
+              {%- elif states.sun.sun is none or is_state('sun.sun', 'below_horizon') -%}ciemno
+              {%- else -%}jasno
+              {%- endif -%}
+            moze_zapalic: >-
+              {{ tryb == 'zapalaj_i_gas' and ruch_jest and wlaczone | count == 0 and not reczne_zgaszenie
+                 and ktos_w_domu and not (noc and noca_nie_zapalaj) }}
+        - choose:
+            - alias: Presence and dark - switching on
+              conditions:
+                - condition: template
+                  value_template: "{{ moze_zapalic and ciemno == 'ciemno' }}"
+              sequence:
+                - variables:
+                    do_zapalenia: "{{ (lampy_nocne if lampy_nocne | count > 0 else lampy) if noc else lampy }}"
+                    przelaczniki: "{{ do_zapalenia | select('match', 'switch\\.') | list }}"
+                - variables:
+                    sciemniane: >-
+                      {%- set ns = namespace(l=[]) -%}
+                      {%- for e in do_zapalenia if e.startswith('light.') -%}
+                        {%- if (state_attr(e, 'supported_color_modes') or []) | reject('in', ['onoff', 'unknown']) | list | count > 0 -%}
+                          {%- set ns.l = ns.l + [e] -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {{ ns.l }}
+                    zwykle: "{{ do_zapalenia | select('match', 'light\\.') | reject('in', sciemniane) | list }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ sciemniane | count > 0 }}"
+                  then:
+                    - action: light.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ sciemniane }}"
+                      data:
+                        brightness_pct: "{{ jasnosc_nocna | int(5) if noc else 100 }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ zwykle | count > 0 }}"
+                  then:
+                    - action: light.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ zwykle }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ przelaczniki | count > 0 }}"
+                  then:
+                    - action: switch.turn_on
+                      continue_on_error: true
+                      target:
+                        entity_id: "{{ przelaczniki }}"
+                - wait_template: "{{ wszystkie_lampy | select('is_state', 'on') | list | count > 0 }}"
+                  timeout:
+                    seconds: 10
+                  continue_on_timeout: true
+                - variables:
+                    zgaszone_ts: 0
+                    przygaszone: {}
+                    reczne_zapalenie_ts: 0
+                    # Lamps do not respond: end the run instead of retrying in a loop.
+                    koniec: "{{ not wait.completed }}"
+
+            - alias: Presence, brightness near the threshold - waiting for darkness to be confirmed
+              conditions:
+                - condition: template
+                  value_template: "{{ moze_zapalic and ciemno == 'czekaj' }}"
+              sequence:
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: !input czujnik_ruchu
+                      from: "on"
+                      id: ruch
+                    - trigger: state
+                      entity_id: !input lampy
+                      to:
+                        - "on"
+                        - "off"
+                      id: lampa
+                    - trigger: state
+                      entity_id: !input lampy_nocne
+                      to:
+                        - "on"
+                        - "off"
+                      id: lampa
+                    - trigger: template
+                      value_template: "{{ czujnik_lx != '' and states(czujnik_lx) | float(0) >= prog_lx | float(10) }}"
+                      id: jasno
+                  timeout:
+                    seconds: "{{ [zwloka_ciemno_s - (teraz - ponizej_od), 1] | max }}"
+                - &reczna_zmiana
+                  alias: Manual lamp change
+                  if:
+                    - condition: template
+                      value_template: >-
+                        {{ wait.trigger is not none and wait.trigger.id == 'lampa'
+                           and wait.trigger.from_state is not none and wait.trigger.from_state.state in ['on', 'off']
+                           and wait.trigger.to_state.context.id != context.id }}
+                  then:
+                    - variables:
+                        reczne_zgaszenie: "{{ wait.trigger.to_state.state == 'off' }}"
+                        reczne_zapalenie_ts: "{{ teraz if wait.trigger.to_state.state == 'on' else reczne_zapalenie_ts }}"
+                        zgaszone_ts: 0
+
+            - alias: Presence - the light is on or is not to be switched on
+              conditions:
+                - condition: template
+                  value_template: "{{ ruch_jest }}"
+              sequence:
+                - if:
+                    - condition: template
+                      value_template: "{{ przygaszone | count > 0 }}"
+                  then:
+                    - alias: Presence while dimmed - brightness restored
+                      repeat:
+                        for_each: >-
+                          {%- set ns = namespace(l=[]) -%}
+                          {%- for e, b in przygaszone.items() if is_state(e, 'on') -%}
+                            {%- set ns.l = ns.l + [{'lampa': e, 'jasnosc': b}] -%}
+                          {%- endfor -%}
+                          {{ ns.l }}
+                        sequence:
+                          - action: light.turn_on
+                            continue_on_error: true
+                            target:
+                              entity_id: "{{ repeat.item.lampa }}"
+                            data:
+                              brightness: "{{ repeat.item.jasnosc | int(255) }}"
+                    - variables:
+                        przygaszone: {}
+                - if:
+                    - condition: template
+                      value_template: "{{ wlaczone | count == 0 and not reczne_zgaszenie }}"
+                  then:
+                    - alias: Nothing to watch - end of the run
+                      variables:
+                        koniec: true
+                  else:
+                    - wait_for_trigger:
+                        - trigger: state
+                          entity_id: !input czujnik_ruchu
+                          from: "on"
+                          id: ruch
+                        - trigger: state
+                          entity_id: !input lampy
+                          to:
+                            - "on"
+                            - "off"
+                          id: lampa
+                        - trigger: state
+                          entity_id: !input lampy_nocne
+                          to:
+                            - "on"
+                            - "off"
+                          id: lampa
+                      timeout:
+                        minutes: 30
+                    - *reczna_zmiana
+
+            - alias: No presence, lamps off
+              conditions:
+                - condition: template
+                  value_template: "{{ wlaczone | count == 0 }}"
+              sequence:
+                - variables:
+                    czekaj_s: >-
+                      {%- if reczne_zgaszenie -%}{{ opoznienie_s - (teraz - ruch_od) }}
+                      {%- elif zgaszone_ts > 0 -%}{{ powrot_s - (teraz - zgaszone_ts) }}
+                      {%- else -%}{{ 0 }}
+                      {%- endif -%}
+                - if:
+                    - condition: template
+                      value_template: "{{ czekaj_s | float(0) < 1 }}"
+                  then:
+                    - alias: Presence over - end of the session
+                      variables:
+                        koniec: true
+                  else:
+                    - wait_for_trigger:
+                        - trigger: state
+                          entity_id: !input czujnik_ruchu
+                          to: "on"
+                          id: ruch
+                        - trigger: state
+                          entity_id: !input lampy
+                          to:
+                            - "on"
+                            - "off"
+                          id: lampa
+                        - trigger: state
+                          entity_id: !input lampy_nocne
+                          to:
+                            - "on"
+                            - "off"
+                          id: lampa
+                      timeout:
+                        seconds: "{{ czekaj_s }}"
+                    - if:
+                        - condition: template
+                          value_template: "{{ wait.trigger is none }}"
+                      then:
+                        - alias: Presence over - end of the session
+                          variables:
+                            koniec: true
+                    - if:
+                        - condition: template
+                          value_template: "{{ wait.trigger is not none and wait.trigger.id == 'ruch' and zgaszone_ts > 0 }}"
+                      then:
+                        - alias: Return at most a minute after switch-off - longer switch-off time
+                          variables:
+                            opoznienie_s: "{{ [opoznienie_s * 2, maks_opoznienie_s] | min }}"
+                    - *reczna_zmiana
+
+          default:
+            - alias: No presence, lamps on - countdown to switch-off
+              variables:
+                gasniecie_ts: "{{ [ruch_od + opoznienie_s, reczne_zapalenie_ts + reczne_min_s] | max }}"
+                do_przygaszenia_s: "{{ [ruch_od + opoznienie_s, reczne_zapalenie_ts + reczne_min_s] | max - przygaszanie_s - teraz }}"
+            - if:
+                - condition: template
+                  value_template: "{{ do_przygaszenia_s > 1 }}"
+              then:
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: !input czujnik_ruchu
+                      to: "on"
+                      id: ruch
+                    - trigger: state
+                      entity_id: !input lampy
+                      to:
+                        - "on"
+                        - "off"
+                      id: lampa
+                    - trigger: state
+                      entity_id: !input lampy_nocne
+                      to:
+                        - "on"
+                        - "off"
+                      id: lampa
+                  timeout:
+                    seconds: "{{ do_przygaszenia_s }}"
+                - *reczna_zmiana
+              else:
+                - alias: Dimming dimmable lamps before switch-off
+                  variables:
+                    przygaszone: >-
+                      {%- set ns = namespace(d={}) -%}
+                      {%- for e in wlaczone if e.startswith('light.') -%}
+                        {%- set b = state_attr(e, 'brightness') -%}
+                        {%- if b is number and (state_attr(e, 'supported_color_modes') or []) | reject('in', ['onoff', 'unknown']) | list | count > 0
+                             and b / 255 * 100 > prog_przygaszania_proc -%}
+                          {%- set ns.d = dict(ns.d, **{e: b | int}) -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {{ ns.d }}
+                - repeat:
+                    for_each: >-
+                      {%- set ns = namespace(l=[]) -%}
+                      {%- for e, b in przygaszone.items() -%}
+                        {%- set ns.l = ns.l + [{'lampa': e, 'jasnosc': b}] -%}
+                      {%- endfor -%}
+                      {{ ns.l }}
+                    sequence:
+                      - action: light.turn_on
+                        continue_on_error: true
+                        target:
+                          entity_id: "{{ repeat.item.lampa }}"
+                        data:
+                          brightness: "{{ [3, (repeat.item.jasnosc | int(0) / 2) | int] | max }}"
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: !input czujnik_ruchu
+                      to: "on"
+                      id: ruch
+                    - trigger: state
+                      entity_id: !input lampy
+                      to:
+                        - "on"
+                        - "off"
+                      id: lampa
+                    - trigger: state
+                      entity_id: !input lampy_nocne
+                      to:
+                        - "on"
+                        - "off"
+                      id: lampa
+                  timeout:
+                    seconds: "{{ przygaszanie_s }}"
+                - *reczna_zmiana
+                - if:
+                    - condition: template
+                      value_template: "{{ wait.trigger is none }}"
+                  then:
+                    - alias: Switching the lamps off
+                      variables:
+                        do_zgaszenia: "{{ wszystkie_lampy | select('is_state', 'on') | list }}"
+                    - if:
+                        - condition: template
+                          value_template: "{{ do_zgaszenia | select('match', 'light\\.') | list | count > 0 }}"
+                      then:
+                        - action: light.turn_off
+                          continue_on_error: true
+                          target:
+                            entity_id: "{{ do_zgaszenia | select('match', 'light\\.') | list }}"
+                    - if:
+                        - condition: template
+                          value_template: "{{ do_zgaszenia | select('match', 'switch\\.') | list | count > 0 }}"
+                      then:
+                        - action: switch.turn_off
+                          continue_on_error: true
+                          target:
+                            entity_id: "{{ do_zgaszenia | select('match', 'switch\\.') | list }}"
+                    - wait_template: "{{ wszystkie_lampy | select('is_state', 'on') | list | count == 0 }}"
+                      timeout:
+                        seconds: 10
+                      continue_on_timeout: true
+                    - variables:
+                        zgaszone_ts: "{{ now().timestamp() }}"
+                        przygaszone: {}
+                        reczne_zapalenie_ts: 0
+                        reczne_zgaszenie: false
+                        # Lamps do not switch off: end the run instead of retrying in a loop.
+                        koniec: "{{ not wait.completed }}"
