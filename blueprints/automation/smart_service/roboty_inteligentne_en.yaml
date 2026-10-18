@@ -1417,16 +1417,19 @@ actions:
                 value_template: "{{ tryb_podgladu }}"
             then:
               - variables:
-                  nowy_powod: "Preview: litter box - I would clean the area now"
-              - if:
-                  - condition: template
-                    value_template: "{{ states(pomocnik_powod) != nowy_powod }}"
-                then:
-                  - action: input_text.set_value
-                    target:
-                      entity_id: !input pomocnik_powod
-                    data:
-                      value: "{{ nowy_powod }}"
+                  S: >-
+                    {%- set s = states(pomocnik_stan) -%}
+                    {{ s | from_json if s.startswith('{') else {} }}
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_stan
+                data:
+                  value: "{%- set J = dict(S, k=0, kf=teraz, e=teraz) -%}{{ (J | to_json) if (J | to_json | length) < 250 else (dict(J, m=J.get('m', [])[-2:], kf=0, wr=0) | to_json) }}"
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Preview: litter box - I would clean the area now ({{ now().strftime('%H:%M') }})"
             else:
               - variables:
                   S: >-

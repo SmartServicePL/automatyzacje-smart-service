@@ -135,7 +135,7 @@
       "id": "robot-sprzatajacy-inteligentny",
       "kategoria": "dom",
       "nazwa": "Inteligentny robot sprzątający – każda marka",
-      "wersja": "1.1.0",
+      "wersja": "1.1.1",
       "min_ha": "2024.10.0",
       "krotki_opis": "Robot sprząta, gdy w domu jest brudno: licznik brudu, pusty dom, nadzór i powód każdej decyzji.",
       "opis": [

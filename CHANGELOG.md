@@ -1,5 +1,10 @@
 # Zmiany
 
+## 2026-10-18
+
+- **Inteligentny robot sprzątający – każda marka** 1.1.1. Wejścia bez zmian.
+  - Tryb podglądu: decyzja o sprzątaniu przy kuwecie jest zapisywana raz (z godziną) i licznik kuwety się zeruje, tak jak po prawdziwym sprzątaniu. Wcześniej ten sam komunikat wracał co 5 minut na zmianę z „Czekam”.
+
 ## 2026-10-17 (4)
 
 - **Alarm – czujniki i tryb nocny** 1.0.0, poprawki przed pierwszym wydaniem. Wejścia bez zmian.
