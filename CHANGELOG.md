@@ -17,6 +17,7 @@
   - Powód czekania podaje prawdziwą przyczynę: „start w oknie 12:00-18:00”, „czekam na pusty dom (domownicy w domu)”, „dziś poza dniami sprzątania”, „maksymalna przerwa minęła”; przy „najbliższy start od …” także stan brudu.
   - Pomocnik daty (najbliższy możliwy start) poza godzinami sprzątania przesuwa się na początek najbliższego okna, zamiast zostawać w przeszłości.
   - Generator tłumaczeń: klucz `kontynuuj_tekst` traktowany jako tekst.
+- Ikony automatyzacji (`assets/ikony`): nowe logo Smart Service (biały domek na jasnoniebieskim kafelku) zamiast poprzedniego znaku.
 
 ## 2026-10-18
 
