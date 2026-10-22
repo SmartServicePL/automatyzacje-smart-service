@@ -34,7 +34,7 @@ LANGUAGES = ("en", "de")
 # Keys whose plain string values are text for people.
 TEXT_KEYS = {
     "name", "description", "label", "alias", "stop", "title", "message",
-    "tytul", "tresc", "nowy_powod",
+    "tytul", "tresc", "nowy_powod", "kontynuuj_tekst",
 }
 # Mappings whose values (not keys) are labels shown to people.
 LABEL_MAPS = {"teksty"}

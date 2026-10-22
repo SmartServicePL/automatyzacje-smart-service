@@ -577,6 +577,8 @@ blueprint:
             Aktionen, die bei jeder Benachrichtigung ausgeführt werden, z. B. notify.mobile_app_telefon.
             Variablen: {{ tytul }}, {{ tresc }}, {{ tag }} (gleich für ein Problem)
             und {{ typ }} (problem, przypomnienie, rozwiazany, informacja). Leer = keine Benachrichtigungen.
+            Bei Pause oder Fehler ist {{ kontynuuj }} = true: Schaltfläche mit der Aktion {{ kontynuuj_akcja }}
+            und dem Titel {{ kontynuuj_tekst }} hinzufügen - nach Entfernen des Hindernisses setzt sie die Reinigung fort.
           default: []
           selector:
             action: {}
@@ -586,6 +588,9 @@ max: 20
 max_exceeded: silent
 trace:
   stored_traces: 50
+
+trigger_variables:
+  robot_wyzwalacz: !input robot
 
 triggers:
   - trigger: time_pattern
@@ -606,6 +611,16 @@ triggers:
     entity_id: !input obecnosc
     to: ~
     id: obecnosc
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "SS_ROBOT_KONTYNUUJ_{{ robot_wyzwalacz.split('.')[1] }}"
+    id: kontynuuj
+  - trigger: event
+    event_type: smart_service_robot_kontynuuj
+    event_data:
+      entity_id: "{{ robot_wyzwalacz }}"
+    id: kontynuuj
 
 variables:
   robot: !input robot
@@ -668,6 +683,9 @@ variables:
   nazwa: "{{ state_attr(robot, 'friendly_name') or robot }}"
   teraz: "{{ now().timestamp() | int }}"
   st: "{{ states(robot) }}"
+  kontynuuj: false
+  kontynuuj_akcja: "SS_ROBOT_KONTYNUUJ_{{ robot.split('.')[1] }}"
+  kontynuuj_tekst: Hindernis entfernt - fortsetzen
   od_zmiany: "{{ ((now() - states[robot].last_changed).total_seconds()) | int if states[robot] is not none else 0 }}"
   noc: "{{ cisza_nocna != '' and is_state(cisza_nocna, 'on') }}"
   funkcje: "{{ state_attr(robot, 'supported_features') | int(0) }}"
@@ -822,6 +840,56 @@ actions:
               tag: "robot_{{ robot.split('.')[1] }}_info"
               typ: informacja
           - sequence: !input akcje_powiadomien
+
+  - alias: Hindernis entfernt - Fortsetzung auf Wunsch
+    if:
+      - condition: template
+        value_template: "{{ trigger.id == 'kontynuuj' }}"
+    then:
+      - choose:
+          - alias: Roboter ist weder pausiert noch im Fehler
+            conditions:
+              - condition: template
+                value_template: "{{ st not in ['paused', 'error'] }}"
+            sequence:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Fortsetzen übersprungen: Roboter ist nicht pausiert (Status: {{ st }})"
+          - alias: Vorschau - nur aufzeichnen
+            conditions:
+              - condition: template
+                value_template: "{{ tryb_podgladu }}"
+            sequence:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Vorschau: ich würde die Reinigung nach Entfernen des Hindernisses fortsetzen ({{ now().strftime('%H:%M') }})"
+        default:
+          - action: vacuum.start
+            continue_on_error: true
+            target:
+              entity_id: !input robot
+          - wait_template: "{{ is_state(robot, 'cleaning') }}"
+            timeout: "00:02:00"
+            continue_on_timeout: true
+          - if:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Nach Entfernen des Hindernisses fortgesetzt ({{ now().strftime('%H:%M') }})"
+            else:
+              - action: input_text.set_value
+                target:
+                  entity_id: !input pomocnik_powod
+                data:
+                  value: "Fortsetzen fehlgeschlagen (Status: {{ states(robot) }}{{ (', ' ~ kod_bledu) if kod_bledu != '' else '' }})"
 
   - alias: Zyklus - Reinigungszustand, Überwachung, Probleme und Start
     if:
@@ -1202,6 +1270,7 @@ actions:
                       tytul: "{{ nazwa }} braucht Aufmerksamkeit"
                       tresc: "{{ opis }}"
                       typ: problem
+                      kontynuuj: "{{ typ_problemu in ['pauza', 'blad'] }}"
                   - sequence: !input akcje_powiadomien
               - alias: Problem besteht - Erinnerung
                 conditions:
@@ -1220,6 +1289,7 @@ actions:
                       tresc: >-
                         Problem seit {{ S.get('po', teraz) | int | timestamp_custom('%d.%m %H:%M') }}. {{ opis }}
                       typ: przypomnienie
+                      kontynuuj: "{{ typ_problemu in ['pauza', 'blad'] }}"
                   - sequence: !input akcje_powiadomien
               - alias: Problem behoben
                 conditions:
@@ -1266,6 +1336,43 @@ actions:
                 {%- elif w_oknie_zwyklym | bool and brud | float >= prog_potrzeby | float -%}brud
                 {%- elif (w_oknie_zwyklym | bool or (w_oknie_pustego_domu | bool and dom_pusty | bool)) and przerwa_przekroczona | bool -%}przerwa
                 {%- endif -%}
+              dopisek_brudu: >-
+                {%- if (brud | float >= prog_potrzeby | float or przerwa_przekroczona | bool) and not w_oknie_zwyklym | bool -%}
+                  {%- if brud | float < prog_potrzeby | float -%}
+                    , maximale Pause überschritten
+                  {%- endif -%}
+                  {%- if ogranicz_dni and dzien not in dni -%}
+                    , heute kein Reinigungstag
+                  {%- else -%}
+                    , Start im Fenster {{ okno_od[:5] }}-{{ okno_do[:5] }}
+                  {%- endif -%}
+                {%- elif w_oknie_pustego_domu | bool and brud | float >= prog_potrzeby | float * pusty_dom_procent | float / 100 and not dom_pusty | bool -%}
+                  {%- if ktos_w_domu | bool -%}
+                    , warte auf leeres Haus (Bewohner zu Hause)
+                  {%- else -%}
+                    , Haus leer seit {{ minut_pustego_domu }} min, Start nach {{ opoznienie_min }} min
+                  {%- endif -%}
+                {%- elif tryb_obecnosci == 'pusty_dom' -%}
+                  , leeres Haus ab {{ pusty_dom_od[:5] }}
+                {%- endif -%}
+              nastepne_okno: >-
+                {%- set ns = namespace(t='') -%}
+                {%- set teraz_s = now().strftime('%Y-%m-%d %H:%M:%S') -%}
+                {%- for d in range(0, 8) -%}
+                  {%- set dz = now().date() + timedelta(days=d) -%}
+                  {%- set dn = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][dz.weekday()] -%}
+                  {%- set k = [] -%}
+                  {%- if not ogranicz_dni or dn in dni -%}
+                    {%- set k = k + [dz.isoformat() ~ ' ' ~ (okno_od if ogranicz_godziny else '00:00:00')] -%}
+                  {%- endif -%}
+                  {%- if tryb_obecnosci == 'pusty_dom' and dn in pusty_dom_dni -%}
+                    {%- set k = k + [dz.isoformat() ~ ' ' ~ pusty_dom_od] -%}
+                  {%- endif -%}
+                  {%- for c in k | sort -%}
+                    {%- if ns.t == '' and c > teraz_s -%}{%- set ns.t = c -%}{%- endif -%}
+                  {%- endfor -%}
+                {%- endfor -%}
+                {{ ns.t }}
               powod_blokady: >-
                 {%- if noc | bool -%}
                   Nachtruhe
@@ -1276,7 +1383,7 @@ actions:
                 {%- elif st not in stany_stacji -%}
                   der Roboter ist nicht in der Station (Zustand: {{ st }})
                 {%- elif nastepne > teraz -%}
-                  nächster Start ab {{ nastepne | timestamp_custom('%d.%m %H:%M') }}
+                  nächster Start ab {{ nastepne | timestamp_custom('%d.%m %H:%M') }} (Schmutz {{ brud | round(0) | int }}/{{ prog_potrzeby | int }})
                 {%- elif bateria != '' and states(bateria) | float(-1) < 0 -%}
                   kein Akkuwert
                 {%- elif bateria != '' and states(bateria) | float(0) < min_bateria | float(0) -%}
@@ -1284,7 +1391,7 @@ actions:
                 {%- elif blokada_wlaczona | bool -%}
                   Reinigungssperre ist aktiv
                 {%- elif regula == '' -%}
-                  Schmutz {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}{{ ', leeres Haus ab ' ~ (pusty_dom_od[:5]) if tryb_obecnosci == 'pusty_dom' else '' }}{{ ', Ersatzprognose' if zrodlo_pogody == 'rezerwa' else (', Wetter unbekannt - zähle wie nach Regen' if zrodlo_pogody == 'nieznane' else '') }}
+                  Schmutz {{ brud | round(0) | int }}/{{ prog_potrzeby | int }}{{ dopisek_brudu }}{{ ', Ersatzprognose' if zrodlo_pogody == 'rezerwa' else (', Wetter unbekannt - zähle wie nach Regen' if zrodlo_pogody == 'nieznane' else '') }}
                 {%- endif -%}
               nazwa_reguly: >-
                 {%- if regula == 'pusty' -%}leeres Haus{%- elif regula == 'brud' -%}Schmutzschwelle{%- else -%}maximale Pause{%- endif -%}
@@ -1294,6 +1401,17 @@ actions:
                   - condition: template
                     value_template: "{{ powod_blokady | trim != '' }}"
                 sequence:
+                  - if:
+                      - condition: template
+                        value_template: >-
+                          {{ nastepne <= teraz and not w_oknie_zwyklym | bool and not w_oknie_pustego_domu | bool
+                             and nastepne_okno != '' and states(pomocnik_nastepne) != nastepne_okno }}
+                    then:
+                      - action: input_datetime.set_datetime
+                        target:
+                          entity_id: !input pomocnik_nastepne
+                        data:
+                          datetime: "{{ nastepne_okno }}"
                   - variables:
                       nowy_powod: "Warte: {{ powod_blokady | trim }}"
                   - if:

@@ -10,6 +10,14 @@
   - Testy: `tests/test_koszenie_deszcz.py` (pierwszeństwo, zapas, pogoda nieznana, cisza nocna, stałość nazw wejść, teksty powodu). Wersje EN i DE przebudowane z katalogu tłumaczeń.
 - **Smart mowing schedule (Worx)**: wersja 0.11.0 w repozytorium `worx_vision_cloud_plus_automation` z tymi samymi wejściami (`pogoda_opad_24h_wstecz`, `deszcz_24h`, `cisza_nocna`, `pomocnik_powod`); dotychczasowy „Zmierzony opad” zostaje ostatnim zapasem, a czujnik deszczu kosiarki bez zmian.
 
+## 2026-10-22
+
+- **Inteligentny robot sprzątający – każda marka** 1.2.0. Istniejące wejścia bez zmian.
+  - Nowy przycisk „Usunąłem przeszkodę - kontynuuj”: przy pauzie i błędzie powiadomienie dostaje zmienne `kontynuuj`, `kontynuuj_akcja` i `kontynuuj_tekst`. Naciśnięcie wznawia sprzątanie (w trybie podglądu tylko zapis), a powód mówi, czy się udało. To samo robi zdarzenie `smart_service_robot_kontynuuj` z `entity_id` robota, np. z przycisku w panelu. Robot nie wznawia się sam.
+  - Powód czekania podaje prawdziwą przyczynę: „start w oknie 12:00-18:00”, „czekam na pusty dom (domownicy w domu)”, „dziś poza dniami sprzątania”, „maksymalna przerwa minęła”; przy „najbliższy start od …” także stan brudu.
+  - Pomocnik daty (najbliższy możliwy start) poza godzinami sprzątania przesuwa się na początek najbliższego okna, zamiast zostawać w przeszłości.
+  - Generator tłumaczeń: klucz `kontynuuj_tekst` traktowany jako tekst.
+
 ## 2026-10-18
 
 - **Inteligentny robot sprzątający – każda marka** 1.1.2. Wejścia bez zmian.

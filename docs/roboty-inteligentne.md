@@ -61,12 +61,15 @@ Robot nigdy nie startuje:
 
 Każda decyzja trafia do pomocnika tekstowego, np.:
 - „Czekam: brud 48/100, pusty dom od 08:15”,
+- „Czekam: brud 111/100, start w oknie 12:00-18:00” albo „…, czekam na pusty dom (domownicy w domu)”,
 - „Sprząta (pusty dom) od 08:20”,
 - „Zakończono 17.10 09:05 (35 min, 31 m²)”,
 - „Pauza: 210030: brak wody”,
 - „Nie wystartował 08:20 (stan: paused, …)”.
 
 Wynik sprzątania zostaje widoczny przez godzinę, potem wraca „Czekam: …”.
+
+Pomocnik daty pokazuje **najbliższy możliwy start**. Poza godzinami sprzątania przesuwa się na początek najbliższego okna (zwykłego albo pustego domu), więc nie zostaje w przeszłości. W oknie data może być już miniona: start nastąpi, gdy brud przekroczy próg.
 
 **Tryb podglądu** (domyślnie włączony): automatyzacja tylko zapisuje, co by zrobiła („Podgląd: wystartowałbym teraz…”), i nie wysyła komend do robota. Wyłącz go, gdy decyzje Ci odpowiadają.
 
@@ -99,7 +102,22 @@ Opcjonalnie:
 W polu **Akcje powiadomienia** dodaj dowolną akcję, np. `notify.mobile_app_twoj_telefon`. Dostępne zmienne:
 - `{{ tytul }}` i `{{ tresc }}`: tytuł i treść powiadomienia;
 - `{{ tag }}`: ten sam dla jednego problemu, więc kolejne powiadomienie zastępuje poprzednie;
-- `{{ typ }}`: `problem`, `przypomnienie`, `rozwiazany` albo `informacja`.
+- `{{ typ }}`: `problem`, `przypomnienie`, `rozwiazany` albo `informacja`;
+- `{{ kontynuuj }}`, `{{ kontynuuj_akcja }}`, `{{ kontynuuj_tekst }}`: przycisk „Usunąłem przeszkodę - kontynuuj” (opis niżej).
+
+**Przycisk „Usunąłem przeszkodę - kontynuuj”.** Gdy robot stoi w pauzie albo w błędzie, `{{ kontynuuj }}` ma wartość `true`. Dodaj wtedy przycisk do powiadomienia aplikacji Home Assistant:
+
+```yaml
+- action: notify.mobile_app_twoj_telefon
+  data:
+    title: "{{ tytul }}"
+    message: "{{ tresc }}"
+    data:
+      tag: "{{ tag }}"
+      actions: "{{ [{'action': kontynuuj_akcja, 'title': kontynuuj_tekst}] if kontynuuj else [] }}"
+```
+
+Po usunięciu przeszkody naciśnij przycisk: automatyzacja wznawia sprzątanie (w trybie podglądu tylko to zapisuje) i w powodzie pisze, czy się udało. Robot nie wznawia się sam, bo przeszkodę musi usunąć człowiek. Ten sam efekt daje zdarzenie `smart_service_robot_kontynuuj` z danymi `entity_id: vacuum.twoj_robot`, np. z przycisku w panelu.
 
 Problem (brak łączności, błąd, problem stacji, długa pauza, robot utknął) wysyła powiadomienie od razu. Dopóki trwa, przypomnienie przychodzi co 6 h, a w ciszy nocnej czeka do rana. Gdy problem minie, przychodzi informacja „problem usunięty”.
 
